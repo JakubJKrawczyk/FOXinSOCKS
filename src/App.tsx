@@ -4,6 +4,7 @@ import { useState  } from "react";
 
 function App() {
 
+  // VARIABLES
   const [selectedItem, setSelectedItem] = useState<taskModel | null>(null);
 
   const tasks : taskModel[] = [
@@ -13,21 +14,39 @@ function App() {
     new taskModel(4, "Scan for Viruses", "Scans the system for viruses and malware", false, 104, "done"),
     new taskModel(5, "Optimize Performance", "Optimizes system performance by cleaning up unnecessary files", true, 105, "idle"),
   ];
+
+  // EVENTS
+  document.onclick = (e) => {
+    if(
+      (e.target as HTMLElement).className.includes("task-item") === false &&
+     (e.target as HTMLElement).className.includes("task-description") === false
+    ) {
+      console.log("clicked outside");
+      setSelectedItem(null);
+    }
+  };
+
+ 
+
+  // FUNCTIONS
+
   function selectTask(index: number, e: React.MouseEvent<HTMLTableRowElement, MouseEvent>, task: taskModel) {
+  
+    console.log("Selected task:", task);
     var element = e.currentTarget as HTMLTableRowElement;
     let listElements = document.getElementsByClassName("task-item");
 
     for (let i = 0; i < listElements.length; i++) {
       listElements[i].setAttribute("className", "task-item");
     }
-
-    element.setAttribute("className", "task-item selected-task-item");
-
-    if(element.className !== "task-item selected-task-item") {
+    
+    if(element.className !== "task-item-add-new task-item") {
+      element.setAttribute("className", "task-item selected-task-item");
       setSelectedItem(task);
     }
   }
 
+  // RENDER
   return (
     <main>
       {/* Main container */}
@@ -52,7 +71,7 @@ function App() {
                   </tr>
                 ))}
                 <tr>
-                  <td className="task-item-add-new task-item ">
+                  <td className="task-item-add-new task-item">
                     Add new...
                   </td>
                 </tr>
