@@ -1,5 +1,8 @@
+import {v4 as uuidv4} from 'uuid';
+
+
 class taskModel {
-    id: number;
+    id: string;
     title: string;
     description: string;
     auto_run: boolean;
@@ -12,7 +15,7 @@ class taskModel {
 
 
     constructor(
-        taskId: number = 0,
+        taskId: string = uuidv4(),
         taskTitle: string = "task",
         taskDescription: string = "",
         taskAutoRun: boolean = false,

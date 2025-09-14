@@ -1,8 +1,7 @@
 import "./style/App.css";
 import taskModel from "./backend/models/taskModel";
-import { Component, useState  } from "react";
+import { useEffect, useId, useState  } from "react";
 import TasksList from "./components/TasksList";
-
 
 function App() {
 
@@ -10,7 +9,7 @@ function App() {
 
     const [selectedItem, setSelectedItem] = useState<taskModel | null>(null);
     const [tasks, setTasks] = useState<taskModel[]>([]);
-    var tasksList = document.getElementsByClassName("tasks-list")[0] as HTMLTableElement
+
   // END OF VARIABLES
 
   // EVENTS
@@ -20,33 +19,48 @@ function App() {
     ) {
       console.log("clicked outside");
       setSelectedItem(null);
+      selectFrontItem(null);
     }
   };
 
+  useEffect(() => {
+      let listElements = document.getElementsByClassName("task-selectable");
+      console.log(listElements.length)
+      var element = listElements[listElements.length - 1] as HTMLElement;
+      selectFrontItem(element)
+    },[tasks])
 
   // FUNCTIONS
 
-  
+  function selectFrontItem(element: HTMLElement | null){
 
-  function updateTask(e: React.FormEvent<HTMLFormElement>) {
+    let listElements = document.getElementsByClassName("task-selectable");
+
+        for (let i = 0; i < listElements.length; i++) {
+        listElements[i].setAttribute("class", "task-item task-selectable");
+        }
+        if(element)
+          element.setAttribute("class", "task-item task-selectable selected-task-item");
+  }
+  
+  function selectTask(e: React.MouseEvent<HTMLTableRowElement, MouseEvent>, task: taskModel) {
+    
+        console.log("Selected task:", task);
+        var element = e.currentTarget as HTMLTableRowElement;
+        selectFrontItem(element)
+        setSelectedItem(task)
+    }
+
+    
+
+  function updateTask() {
     console.log("Updating task...");
     
-    if(selectedItem) {
-      const formData = new FormData(e.currentTarget);
-      selectedItem.title = formData.get("task-title") as string;
-      selectedItem.description = formData.get("task-description") as string;
-      selectedItem.status = formData.get("task-status") as "sheduled" | "in-progress" | "idle" | "done";
-      selectedItem.auto_run = formData.get("task-auto-run") === "on";
-      selectedItem.auto_run_interval = Number(formData.get("task-auto-run-interval"));
-      selectedItem.number_of_dup_to_keep = Number(formData.get("task-number-of-dups"));
-      selectedItem.regex_patterns = (formData.get("task-regex-patterns") as string).split("\n").map(pattern => pattern.trim()).filter(pattern => pattern.length > 0);
-      selectedItem.folder_paths = (formData.get("task-folder-paths") as string).split("\n").map(path => path.trim()).filter(path => path.length > 0);
-    }
+  
     const newTasks = tasks.map((task) => 
-      task.id == selectedItem?.id ? { ...task, task } : task 
-    );
-    setTasks(newTasks);
-
+      task.id == selectedItem!.id ? task = selectedItem! : task
+    )
+    setTasks(newTasks)
   };
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
@@ -90,7 +104,10 @@ function App() {
 
   function addTask(){
     console.log("Adding new task")
-    setTasks([...tasks, new taskModel()])
+    let newTask = new taskModel();
+    setTasks([...tasks, newTask])
+    setSelectedItem(newTask)
+    
   }
   
   // RENDER
@@ -107,11 +124,11 @@ function App() {
         <div className="container-bottom"> 
           {/* List of tasks */}
           
-          <TasksList t={tasks} setSelectedItem={setSelectedItem} addTask={addTask} />
+          <TasksList t={tasks} selectTask={selectTask} addTask={addTask} />
           
           {/* Task description */}
           {selectedItem && (
-            <form className="task-description" datatype="taskModel" onSubmit={(e) => updateTask(e as React.FormEvent<HTMLFormElement>)}>
+            <form className="task-description" datatype="taskModel">
               <div className="task-title-container">
                 <input className="task-title-input" type="text" value={selectedItem.title} name="task-title" onChange={handleChange}/>
               </div>
@@ -147,7 +164,7 @@ function App() {
                 <textarea className="task-folder-paths-input" value={selectedItem.folder_paths.join("\n")} name="task-folder-paths" onChange={handleChange}/>
               </div>
               <div className="task-save-button-container">
-                <button className="task-save-button" type="submit">Save</button>
+                <button type="button" className="task-save-button" onClick={() => updateTask()}>Save</button>
               </div>
               
             </form>
