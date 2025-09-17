@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "foxinsocks",
-        "width": 800,
-        "height": 600
+        "minWidth": 1000,
+        "minHeight": 600
       }
     ],
     "security": {

@@ -81,7 +81,7 @@ function App() {
           updated.status = value as "sheduled" | "in-progress" | "idle" | "done";
           break;
         case "task-auto-run":
-          updated.auto_run = value.toString() === "true";
+          updated.auto_run = (e.target as HTMLInputElement).checked;
           break;
         case "task-auto-run-interval":
           updated.auto_run_interval = Number(value);
@@ -130,41 +130,32 @@ function App() {
           {selectedItem && (
             <form className="task-description" datatype="taskModel">
               <div className="task-title-container">
-                <input className="task-title-input" type="text" value={selectedItem.title} name="task-title" onChange={handleChange}/>
+                <input className="task-title-input" type="text" value={selectedItem.title} placeholder="Nazwa taska..." name="task-title" onChange={handleChange}/>
               </div>
               <div className="task-description-container">
-                <label className="task-description-label">Description:</label>
-                <textarea className="task-description-input" value={selectedItem.description} name="task-description" onChange={handleChange}/>
-              </div>
-              <div className="task-status-container">
-                <select className="task-status-input" value={selectedItem.status} name="task-status" onChange={handleChange}>
-                  <option value="idle">Idle</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="done">Done</option>
-                </select>
-              </div>
-              <div className="task-auto-run-container">
-                <input className="task-auto-run-input" type="checkbox" checked={selectedItem.auto_run} name="task-auto-run" onChange={handleChange}/>
-                <label className="task-auto-run-label"> Auto Run</label>
-              </div>
-              <div className="task-interval-container">
-                <input className="task-interval-input" type="number" value={selectedItem.auto_run_interval} name="task-auto-run-interval" onChange={handleChange}/>
-                <label className="task-interval-label"> Minutes Interval</label>
-              </div>
-              <div className="task-number-of-dups-container">
-                <input className="task-number-of-dups-input" type="number" value={selectedItem.number_of_dup_to_keep} name="task-number-of-dups" onChange={handleChange}/>
-                <label className="task-number-of-dups-label"> Number of Duplicates to Keep</label>
+                <textarea className="task-description-input" placeholder="Opis..." value={selectedItem.description} name="task-description" onChange={handleChange}/>
               </div>
               <div className="task-regex-patterns-container">
-                <label className="task-regex-patterns-label">Regex Patterns:</label>
-                <textarea className="task-regex-patterns-input" value={selectedItem.regex_patterns.join("\n")} name="task-regex-patterns" onChange={handleChange}/>
+                <textarea className="task-regex-patterns-input" value={selectedItem.regex_patterns.join("\n")} placeholder="Wzory plików" name="task-regex-patterns" onChange={handleChange}/>
               </div>
               <div className="task-folder-paths-container">
-                <label className="task-folder-paths-label">Folder Paths:</label>
-                <textarea className="task-folder-paths-input" value={selectedItem.folder_paths.join("\n")} name="task-folder-paths" onChange={handleChange}/>
+                <textarea className="task-folder-paths-input" value={selectedItem.folder_paths.join("\n")} placeholder="Ścieżki folderów" name="task-folder-paths" onChange={handleChange}/>
+              </div>
+            
+              <div className="task-auto-run-container">
+                <label className="task-auto-run-label"> Auto Run</label>
+                <input className="task-auto-run-input" checked={selectedItem.auto_run} type="checkbox" name="task-auto-run" onChange={handleChange}/>
+              </div>
+              <div className="task-interval-container">
+                <label className="task-interval-label"> Minutes Interval: </label>
+                <input className="task-interval-input" type="number" value={selectedItem.auto_run_interval} name="task-auto-run-interval" onChange={handleChange}/>
+              </div>
+              <div className="task-number-of-dups-container">
+                <label className="task-number-of-dups-label"> Number of Duplicates to Keep: </label>
+                <input className="task-number-of-dups-input" type="number" value={selectedItem.number_of_dup_to_keep} name="task-number-of-dups" onChange={handleChange}/>
               </div>
               <div className="task-save-button-container">
-                <button type="button" className="task-save-button" onClick={() => updateTask()}>Save</button>
+                <button type="button" className="task-save-button" onClick={() => updateTask()}>Zapisz</button>
               </div>
               
             </form>
