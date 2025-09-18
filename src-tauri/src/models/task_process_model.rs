@@ -1,13 +1,14 @@
 use tokio::task;
-mod task_model;
-#[derive(Default)]
+
+use crate::models::task_model::TaskModel;
+
 pub struct TaskProcessModel{
-    pub process: &task::Id,
-    pub task: &TaskModel
+    pub process: task::JoinHandle<String>,
+    pub task: TaskModel
 }
 
 impl TaskProcessModel{
-    pub fn New(process: &task, task: &TaskModel) -> TaskProcessModel{
+    pub fn new(process: task::JoinHandle<String>, task: TaskModel) -> TaskProcessModel{
 
 
         TaskProcessModel {

@@ -3,12 +3,5 @@
     mod models;
 
 fn main() {
-    use tokio::task;
-    
-    let t1 = models::TaskProcessModel {
-        task: TaskModel::default(),
-        process: task::spawn(async { "haha"})
-    };
-
     foxinsocks_lib::run()
 }
