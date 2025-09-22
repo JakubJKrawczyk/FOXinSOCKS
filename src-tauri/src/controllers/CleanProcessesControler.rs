@@ -79,8 +79,8 @@ impl clean_process_controller{
         }
     }
 
-    pub fn stop_process(&self, id: String) -> Result<(), String>{
-        if let Some(task_process) = self.tasks_processes.iter().find(|task| task.task_id == id){
+    pub fn stop_process(&self, task_id: String) -> Result<(), String>{
+        if let Some(task_process) = self.tasks_processes.iter().find(|task| task.task_id == task_id){
             if task_process.process.is_finished() == false {
                 task_process.process.abort();
             }
