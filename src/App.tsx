@@ -2,6 +2,7 @@ import "./style/App.css";
 import taskModel from "./backend/models/taskModel";
 import { useEffect, useId, useState  } from "react";
 import TasksList from "./components/TasksList";
+import TasksController from "./backend/utilities/tasksController";
 
 function App() {
 
@@ -10,6 +11,7 @@ function App() {
     const [selectedItem, setSelectedItem] = useState<taskModel | null>(null);
     const [tasks, setTasks] = useState<taskModel[]>([]);
 
+    const controller = new TasksController();
   // END OF VARIABLES
 
   // EVENTS
@@ -55,7 +57,6 @@ function App() {
 
   function updateTask() {
     console.log("Updating task...");
-    
   
     const newTasks = tasks.map((task) => 
       task.id == selectedItem!.id ? task = selectedItem! : task

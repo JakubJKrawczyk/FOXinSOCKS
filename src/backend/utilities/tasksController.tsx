@@ -1,3 +1,5 @@
+import taskModel from "../models/taskModel";
+
 declare global {
     interface Window {
         __TAURI__: {
@@ -6,34 +8,49 @@ declare global {
     }
 }
 
+type Success<T> = { ok: true; data: T };
+type SuccessVoid = { ok: true };
+type Failure = { ok: false; error: string };
+
 class TasksController {
-    async init(): Promise<void> {
-        return await window.__TAURI__.invoke("init");
+    // Uniwersalny wrapper
+    private async call<T = void>(cmd: string, args?: any): Promise<Success<T> | SuccessVoid | Failure> {
+        try {
+            const res = await window.__TAURI__.invoke(cmd, args);
+            if (res === undefined) return { ok: true };
+            return { ok: true, data: res as T };
+        } catch (e: any) {
+            return { ok: false, error: (e?.toString?.() || "Unknown error") };
+        }
     }
 
-    async getTasks(): Promise<any[]> {
-        return await window.__TAURI__.invoke("get_tasks");
+    async init() {
+        return this.call("init");
     }
 
-    async getTask(task_id: string): Promise<any> {
-        return await window.__TAURI__.invoke("get_task", { task_id });
+    async getTasks() {
+        return this.call<taskModel[]>("get_tasks");
     }
 
-    async addTask(task_to_add: any): Promise<void> {
-        return await window.__TAURI__.invoke("add_task", { task_to_add });
+    async getTask(task_id: string) {
+        return this.call<taskModel>("get_task", { task_id });
     }
 
-    async delTask(task_id: string): Promise<void> {
-        return await window.__TAURI__.invoke("del_task", { task_id });
+    async addTask(task_to_add: taskModel) {
+        return this.call("add_task", { task_to_add });
     }
 
-    async runTask(task_id: string): Promise<void> {
-        return await window.__TAURI__.invoke("run_task", { task_id });
+    async delTask(task_id: string) {
+        return this.call("del_task", { task_id });
     }
 
-    async stopTask(task_id: string): Promise<void> {
-        return await window.__TAURI__.invoke("stop_task", { task_id });
+    async runTask(task_id: string) {
+        return this.call("run_task", { task_id });
+    }
+
+    async stopTask(task_id: string) {
+        return this.call("stop_task", { task_id });
     }
 }
 
-export default TasksController
+export default TasksController;

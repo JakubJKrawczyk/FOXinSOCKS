@@ -26,21 +26,21 @@ impl clean_process_controller{
         }
     }
 
-    pub fn get_task(&self, id: String) -> Option<&TaskModel>
+    pub fn get_task(&self, id: &str) -> Option<&TaskModel>
     {
         self.tasks.iter().find(|task| task.id == id)
     }
 
-    pub fn update_task(&mut self, new_task: TaskModel) -> Result<String, String>{
+    pub fn update_task(&mut self, new_task: &TaskModel) -> Result<String, String>{
         if let Some(task) = self.tasks.iter_mut().find(|task| task.id == new_task.id){
-            *task = new_task;
+            *task = new_task.clone();
             Ok(String::from("Task zaktualizowany"))
         }else{
             Err(String::from("Nie znaleziono taska"))
         }
     }
 
-    pub fn delete_task(&mut self, task_id: String) -> Result<String, String>{
+    pub fn delete_task(&mut self, task_id: &str) -> Result<String, String>{
         if let Some(pos) = self.tasks.iter().position(|task| task.id == task_id){
             self.tasks.remove(pos);
             Ok(String::from("Udało się usunąć taska"))
@@ -49,28 +49,28 @@ impl clean_process_controller{
         }
     }
 
-    pub fn add_task(&mut self, task: TaskModel) -> Result<TaskModel, String>{
+    pub fn add_task(&mut self, task: &TaskModel) -> Result<TaskModel, String>{
         if self.tasks.iter().any(|t| t.id == task.id) == false{
 
             self.tasks.push(task.clone());
-            Ok(task)
+            Ok(task.clone())
         }else{
             Err(String::from("W systemie istnieje już task o takim Id"))
         }
     }
 
-    pub fn create_process(&mut self, task_model: TaskModel) -> Result<(), String>{
+    pub fn create_process(&mut self, task_model: &TaskModel) -> Result<(), String>{
         if self.tasks_processes.iter().any(|task_process| task_process.task_id == task_model.id) == false{
             let new_entry = TaskProcessModel::new(
                 task::spawn(
                     cleaning_command(
-                        task_model.regex_patterns,
-                        task_model.folder_paths,
+                        task_model.regex_patterns.clone(),
+                        task_model.folder_paths.clone(),
                         task_model.auto_run_interval,
                         task_model.number_of_dup_to_keep
                     )
                 ),
-                task_model.id
+                task_model.id.clone()
             );
                 self.tasks_processes.push(new_entry);
                 Ok(())
@@ -79,7 +79,7 @@ impl clean_process_controller{
         }
     }
 
-    pub fn stop_process(&self, task_id: String) -> Result<(), String>{
+    pub fn stop_process(&self, task_id: &str) -> Result<(), String>{
         if let Some(task_process) = self.tasks_processes.iter().find(|task| task.task_id == task_id){
             if task_process.process.is_finished() == false {
                 task_process.process.abort();
