@@ -104,13 +104,22 @@ pub async fn cleaning_command(regex_patterns: Vec<String>, folder_paths: Vec<Str
             }
 
             for regex_str in &regex_patterns {
-                if let Ok(re) = Regex::new(regex_str) {
-                    // grupowanie plików wg nazwy (np. same base name)
+                let re = Regex::new(regex_str);
+
+                if re.is_err() {
+                    continue;
+                }
+
+                let re = &re.unwrap();
+                   // grupowanie plików wg nazwy (np. same base name)
                     let mut file_groups: HashMap<String, Vec<(String, std::time::SystemTime)>> = HashMap::new();
 
                     for entry in WalkDir::new(folder_path).into_iter().filter_map(|e| e.ok()) {
-                        if entry.file_type().is_file() {
-                            let file_name = entry.file_name().to_string_lossy().to_string();
+                        if entry.file_type().is_file()== false{
+                           continue;
+                        }
+
+                         let file_name = entry.file_name().to_string_lossy().to_string();
                             if re.is_match(&file_name) {
                                 if let Ok(metadata) = entry.metadata() {
                                     if let Ok(modified) = metadata.modified() {
@@ -120,7 +129,6 @@ pub async fn cleaning_command(regex_patterns: Vec<String>, folder_paths: Vec<Str
                                     }
                                 }
                             }
-                        }
                     }
 
                     // sprzątanie w każdej grupie
@@ -136,7 +144,6 @@ pub async fn cleaning_command(regex_patterns: Vec<String>, folder_paths: Vec<Str
                             }
                         }
                     }
-                }
             }
         }
 
