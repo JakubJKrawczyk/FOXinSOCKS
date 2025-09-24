@@ -51,6 +51,10 @@ class TasksController {
     async stopTask(task_id: string) {
         return this.call("stop_task", { task_id });
     }
+
+    async updateTask(task_to_update: taskModel) {
+        return this.call("update_task", { task_to_update });
+    }
 }
 
 export default TasksController;

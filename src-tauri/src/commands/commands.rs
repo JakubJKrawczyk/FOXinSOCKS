@@ -1,17 +1,17 @@
-use crate::controllers::CleanProcessesControler::clean_process_controller;
+use crate::controllers::CleanProcessesControler::CleanProcessController;
 use std::os::windows::process;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use crate::models::task_model::TaskModel;
-pub static controller: OnceLock<Mutex<clean_process_controller>> = OnceLock::new();
+pub static controller: OnceLock<Mutex<CleanProcessController>> = OnceLock::new();
 pub static initialized: AtomicBool = AtomicBool::new(false);
 
 
 #[tauri::command]
 pub async fn init() -> Result<(), String> {
     if initialized.load(Ordering::SeqCst) {
-        let _ = controller.set(Mutex::new(clean_process_controller::new()));
+        let _ = controller.set(Mutex::new(CleanProcessController::new()));
         initialized.store(true, Ordering::SeqCst);
         Ok(())
     } else {
@@ -49,7 +49,7 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
         }
         Ok(())
     }else{
-        Err(String::from("Rust Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
+        Err(String::from("Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
     }
  }
 
@@ -62,7 +62,7 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
         }
         Ok(())
     }else{
-        Err(String::from("Rust Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
+        Err(String::from("Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
     }
  }
 
@@ -86,7 +86,7 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
             Err(format!("Nie znaleziono zadania dla id {}", task_id))
         }
     } else {
-        Err(String::from("Rust Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
+        Err(String::from("Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
     }
  }
 
@@ -104,13 +104,13 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
             if proc.is_ok() {
                 Ok(())
             }else{
-                Err(String::from("Błąd tworzenia procesu dla taska"))
+                Err(String::from("Błąd zatrzymywania procesu dla taska"))
             }
         } else {
             Err(format!("Nie znaleziono zadania dla id {}", task_id))
         }
     } else {
-        Err(String::from("Rust Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
+        Err(String::from("Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
     }
  }
 
@@ -129,7 +129,7 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
                 if proc.is_ok() {
                     return Ok(())
                 }else{
-                    return Err(String::from("Błąd tworzenia procesu dla taska"));
+                    return Err(String::from("Błąd zatrzymywania procesu dla taska"));
                 }
             }
 
@@ -145,6 +145,6 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
             Err(format!("Nie znaleziono zadania dla id {}", backend_task.unwrap().id))
         }
     } else {
-        Err(String::from("Rust Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
+        Err(String::from("Rust nie został zainicjalizowany! użyj metody init żeby to zmienić"))
     }
  }

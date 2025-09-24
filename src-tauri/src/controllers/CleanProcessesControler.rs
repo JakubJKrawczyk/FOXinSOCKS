@@ -10,17 +10,17 @@ use walkdir::WalkDir;
 use std::fs::{self};
 use tokio::time::{sleep, Duration};
 
-pub struct clean_process_controller{
+pub struct CleanProcessController{
     pub tasks_processes: Vec<TaskProcessModel>,
     pub tasks : Vec<TaskModel>
 }
 
-impl clean_process_controller{
+impl CleanProcessController{
     pub fn new() -> Self {
         let _ = FileSystemController::file_system_controller::init();
         let tasks = FileSystemController::file_system_controller::get_tasks();
 
-        clean_process_controller {
+        CleanProcessController {
             tasks: tasks,
             tasks_processes: Vec::new()
         }

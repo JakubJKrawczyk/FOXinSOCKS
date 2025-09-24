@@ -29,7 +29,7 @@ pub mod file_system_controller{
         }
     }
 
-    pub fn save_tasks(tasks: Vec<TaskModel>) -> Result<(), String>{
+    pub fn save_tasks(tasks: Vec<&TaskModel>) -> Result<(), String>{
         let file_path = Path::new(constants::TASKS_FILE_NAME);
 
         let mut stream = File::open(file_path).unwrap();
