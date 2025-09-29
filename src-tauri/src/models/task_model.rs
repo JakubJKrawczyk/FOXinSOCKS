@@ -1,14 +1,18 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub enum TaskStatus{
-    sheduled,
-    inProgress,
+    #[serde(rename="sheduled")] // zachowanie dotychczasowego stringa (pisownia w danych)
+    Sheduled,
+    #[serde(rename="in-progress")] // dostosowane do frontendu
+    InProgress,
     #[default]
-    idle
+    #[serde(rename="idle")]
+    Idle
 }
 
-#[derive(Default, Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct TaskModel{
     pub id: String,
     pub title: String,
@@ -23,29 +27,33 @@ pub struct TaskModel{
 }
 
 impl TaskModel{
-    pub fn new(
-        id: String,
-        title: String,
-        description: String,
-        auto_run: bool,
-        auto_run_interval: u32,
-        task_process_id: u32,
-        status: TaskStatus,
-        regex_patterns: Vec<String>,
-        folder_path: String,
-        number_of_dup_to_keep: u8
-    ) -> TaskModel{
+    /// Utwórz nowy TaskModel z domyślnymi wartościami i auto-generowanym ID.
+    /// Domyślne wartości:
+    ///  title: "New Task"
+    ///  description: ""
+    ///  auto_run: false
+    ///  auto_run_interval: 60 (minut)
+    ///  task_process_id: 0
+    ///  status: TaskStatus::Idle
+    ///  regex_patterns: []
+    ///  folder_path: ""
+    ///  number_of_dup_to_keep: 2
+    pub fn new_default() -> TaskModel {
         TaskModel {
-            id: id,
-            title: title,
-            description: description,
-            auto_run: auto_run,
-            auto_run_interval: auto_run_interval,
-            task_process_id: task_process_id,
-            status: status,
-            regex_patterns: regex_patterns,
-            folder_path: folder_path,
-            number_of_dup_to_keep: number_of_dup_to_keep
+            id: Uuid::new_v4().to_string(),
+            title: "New Task".to_string(),
+            description: String::new(),
+            auto_run: false,
+            auto_run_interval: 60,
+            task_process_id: 0,
+            status: TaskStatus::Idle,
+            regex_patterns: Vec::new(),
+            folder_path: String::new(),
+            number_of_dup_to_keep: 2,
         }
     }
+}
+
+impl Default for TaskModel {
+    fn default() -> Self { TaskModel::new_default() }
 }

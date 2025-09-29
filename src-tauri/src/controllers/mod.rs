@@ -1,2 +1,2 @@
-pub mod FileSystemController;
-pub mod CleanProcessesControler;
+pub mod file_system_controller;
+pub mod clean_processes_controller;

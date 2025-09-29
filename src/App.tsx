@@ -25,14 +25,36 @@ function App() {
     }
   };
 
+  // On tasks change: highlight last
   useEffect(() => {
-      let listElements = document.getElementsByClassName("task-selectable");
-      console.log(listElements.length)
-      var element = listElements[listElements.length - 1] as HTMLElement;
-      selectFrontItem(element)
-    },[tasks])
+    const listElements = document.getElementsByClassName("task-selectable");
+    if(listElements.length === 0) return;
+    const element = listElements[listElements.length - 1] as HTMLElement;
+    selectFrontItem(element)
+  },[tasks]);
+
+  // Initial backend init + load tasks + log path
+  useEffect(() => {
+    (async () => {
+      const initRes = await controller.init();
+      if(!initRes.ok){ console.warn("Init backend error:", initRes.error); }
+      const tasksRes = await controller.getTasks();
+      if(tasksRes.ok && 'data' in tasksRes){ setTasks(tasksRes.data); } else { console.warn("Pobieranie tasków nieudane"); }
+      const logRes = await controller.getLogPath();
+      if(logRes.ok && 'data' in logRes){ console.log("Ścieżka pliku logu:", logRes.data); }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // FUNCTIONS
+  async function refreshTasks(){
+    const res = await controller.getTasks();
+    if(res.ok && 'data' in res){
+      setTasks(res.data);
+    }else{
+      console.warn('Nie udało się pobrać tasków po operacji');
+    }
+  }
 
   function selectFrontItem(element: HTMLElement | null){
 
@@ -55,14 +77,12 @@ function App() {
 
     
 
-  function updateTask() {
-    console.log("Updating task...");
-  
-    const newTasks = tasks.map((task) => 
-      task.id == selectedItem!.id ? task = selectedItem! : task
-    )
-    controller.updateTask(selectedItem!);
-    setTasks(newTasks)
+  async function updateTask() {
+    if(!selectedItem) return;
+    console.log("Updating task...", selectedItem.id);
+    const res = await controller.updateTask(selectedItem);
+    if(!res.ok){ console.error('Błąd aktualizacji backend:', res.error); }
+    await refreshTasks();
   };
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
@@ -104,30 +124,34 @@ function App() {
     });
   }
 
-  function addTask(){
-    console.log("Adding new task")
-    let newTask = new taskModel();
-    setTasks([...tasks, newTask])
-    setSelectedItem(newTask)
-    controller.addTask(newTask);
-    
+  async function newTask(){
+    console.log("Adding new task");
+    const res = await controller.addTask();
+    if(!res.ok){
+      console.error('Błąd dodawania na backend:', res.error);
+      return;
+    }
+    // Użyj obiektu z backendu aby ID było spójne
+    const backendTask = 'data' in res ? res.data : null;
+    await refreshTasks();
+    if(backendTask){
+      setSelectedItem(backendTask as taskModel);
+    }
   }
 
-  function delTask(id: string){
-    console.log("Deleting task with id: " + id)
-    let newTasks = tasks.filter((task) => task.id !== id);
-    controller.delTask(id);
-    setTasks(newTasks);
-  
+  async function delTask(id: string){
+    console.log("Deleting task with id: " + id);
+    const res = await controller.delTask(id);
+    if(!res.ok){ console.error('Błąd usuwania:', res.error); }
+    await refreshTasks();
+    if(selectedItem && selectedItem.id === id){ setSelectedItem(null); }
   }
 
-  function runTask(id: string){
-    console.log("Running task with id: " + id)
-    controller.runTask(id);
-    let newTasks = tasks.map((task) => 
-      task.id == id ? {...task, status: TaskStatus.InProgress} : task
-    )
-    setTasks(newTasks);
+  async function runTask(id: string){
+    console.log("Running task with id: " + id);
+    const res = await controller.runTask(id);
+    if(!res.ok){ console.error('Błąd uruchamiania:', res.error); }
+    await refreshTasks();
   }
   
   // RENDER
@@ -144,7 +168,7 @@ function App() {
         <div className="container-bottom"> 
           {/* List of tasks */}
 
-          <TasksList t={tasks} selectTask={selectTask} addTask={addTask} delTask={delTask} runTask={runTask}/>
+          <TasksList t={tasks} selectTask={selectTask} addTask={newTask} delTask={delTask} runTask={runTask}/>
 
           {/* Task description */}
           {selectedItem && (

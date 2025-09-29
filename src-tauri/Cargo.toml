@@ -26,4 +26,15 @@ tokio = {version = "1.47.1", features= ["full"] }
 rustc-serialize = "0.3.25"
 regex = "1.11.2"
 walkdir = "2.5.0"
+chrono = { version = "0.4", features = ["clock", "std", "serde"] }
+uuid = { version = "1", features = ["v4", "fast-rng", "serde"] }
+
+[profile.release]
+# Dodatkowe optymalizacje i redukcja rozmiaru binarki (opcjonalne)
+# Jeśli już istnieje sekcja profile.release, połącz ustawienia zamiast duplikować.
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+opt-level = "z"
 
