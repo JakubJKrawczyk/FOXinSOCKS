@@ -1,4 +1,4 @@
-import taskModel from "../models/taskModel";
+import {taskModel} from "../models/taskModel";
 
 declare global {
     interface Window {

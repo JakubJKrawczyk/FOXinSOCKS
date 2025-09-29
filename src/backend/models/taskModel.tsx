@@ -1,5 +1,10 @@
 import {v4 as uuidv4} from 'uuid';
-
+enum TaskStatus {
+    Sheduled = "sheduled",
+    InProgress = "in-progress",
+    Idle = "idle",
+    Done = "done"
+}
 
 class taskModel {
     id: string;
@@ -8,9 +13,9 @@ class taskModel {
     auto_run: boolean;
     auto_run_interval: number; // in minutes
     task_process_id: number;
-    status: "sheduled" | "in-progress" | "idle" | "done";
+    status: TaskStatus;
     regex_patterns: string[];
-    folder_paths: string[];
+    folder_path: string;
     number_of_dup_to_keep: number;
 
 
@@ -20,10 +25,10 @@ class taskModel {
         taskDescription: string = "",
         taskAutoRun: boolean = false,
         taskProcessId: number = 0,
-        taskStatus: "sheduled" | "in-progress" | "idle" | "done" = "idle",
+        taskStatus: TaskStatus = TaskStatus.Idle,
         auto_run_interval: number = 60,
         regex_patterns: string[] = [],
-        folder_paths: string[] = [],
+        folder_path: string = "",
         number_of_dup_to_keep: number = 2
     ) {
         this.id = taskId;
@@ -34,9 +39,9 @@ class taskModel {
         this.status = taskStatus;
         this.auto_run_interval = auto_run_interval;
         this.regex_patterns = regex_patterns;
-        this.folder_paths = folder_paths;
+        this.folder_path = folder_path;
         this.number_of_dup_to_keep = number_of_dup_to_keep;
     }
 }
 
-export default taskModel;
+export {taskModel, TaskStatus};

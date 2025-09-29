@@ -1,12 +1,14 @@
-import taskModel from "../backend/models/taskModel"
+import {taskModel} from "../backend/models/taskModel"
 
 interface TasksListProps{
     t: taskModel[];
     selectTask: (e: React.MouseEvent<HTMLTableRowElement, MouseEvent>, task: taskModel) => void;
     addTask: () => void;
+    delTask: (id: string) => void;
+    runTask: (id: string) => void;
 }
 
-export default function TasksList({ t, selectTask, addTask }: TasksListProps){
+export default function TasksList({ t, selectTask, addTask, delTask, runTask }: TasksListProps){
        /**
      *
      */
@@ -22,6 +24,8 @@ export default function TasksList({ t, selectTask, addTask }: TasksListProps){
                       <label> {task.title}</label>
                     </td>
                     <td className="task-item-status">{task.status}</td>
+                    <td className="task-item-run" onClick={() => runTask(task.id)}>▶</td>
+                    <td className="task-item-del" onClick={() => delTask(task.id)}>X</td>
                   </tr>
                 ))}
                 <tr>

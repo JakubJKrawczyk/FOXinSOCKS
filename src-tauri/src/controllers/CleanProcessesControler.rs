@@ -65,7 +65,7 @@ impl CleanProcessController{
                 task::spawn(
                     cleaning_command(
                         task_model.regex_patterns.clone(),
-                        task_model.folder_paths.clone(),
+                        task_model.folder_path.clone(),
                         task_model.auto_run_interval,
                         task_model.number_of_dup_to_keep
                     )
@@ -92,12 +92,11 @@ impl CleanProcessController{
 }
 
 
-pub async fn cleaning_command(regex_patterns: Vec<String>, folder_paths: Vec<String>, interval: u32, dup_to_leave: u8) -> String {
+pub async fn cleaning_command(regex_patterns: Vec<String>, folder_path: String, interval: u32, dup_to_leave: u8) -> String {
 
     
     loop {
-        for folder in &folder_paths {
-            let folder_path = Path::new(folder);
+        let folder_path = Path::new(&folder_path);
 
             if !folder_path.exists() || !folder_path.is_dir() {
                 continue;
@@ -151,4 +150,4 @@ pub async fn cleaning_command(regex_patterns: Vec<String>, folder_paths: Vec<Str
     }
 
 
-}              
+            

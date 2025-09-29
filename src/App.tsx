@@ -1,6 +1,6 @@
 import "./style/App.css";
-import taskModel from "./backend/models/taskModel";
-import { useEffect, useId, useState  } from "react";
+import {taskModel, TaskStatus} from "./backend/models/taskModel";
+import { useEffect, useState  } from "react";
 import TasksList from "./components/TasksList";
 import TasksController from "./backend/utilities/tasksController";
 
@@ -61,6 +61,7 @@ function App() {
     const newTasks = tasks.map((task) => 
       task.id == selectedItem!.id ? task = selectedItem! : task
     )
+    controller.updateTask(selectedItem!);
     setTasks(newTasks)
   };
 
@@ -79,7 +80,7 @@ function App() {
           updated.description = value;
           break;
         case "task-status":
-          updated.status = value as "sheduled" | "in-progress" | "idle" | "done";
+          updated.status = value as TaskStatus;
           break;
         case "task-auto-run":
           updated.auto_run = (e.target as HTMLInputElement).checked;
@@ -93,8 +94,8 @@ function App() {
         case "task-regex-patterns":
           updated.regex_patterns = value.split("\n").map(pattern => pattern.trim()).filter(pattern => pattern.length > 0);
           break;
-        case "task-folder-paths":
-          updated.folder_paths = value.split("\n").map(path => path.trim()).filter(path => path.length > 0);
+        case "task-folder-path":
+          updated.folder_path = value;
           break;
         default:
           break;
@@ -108,7 +109,25 @@ function App() {
     let newTask = new taskModel();
     setTasks([...tasks, newTask])
     setSelectedItem(newTask)
+    controller.addTask(newTask);
     
+  }
+
+  function delTask(id: string){
+    console.log("Deleting task with id: " + id)
+    let newTasks = tasks.filter((task) => task.id !== id);
+    controller.delTask(id);
+    setTasks(newTasks);
+  
+  }
+
+  function runTask(id: string){
+    console.log("Running task with id: " + id)
+    controller.runTask(id);
+    let newTasks = tasks.map((task) => 
+      task.id == id ? {...task, status: TaskStatus.InProgress} : task
+    )
+    setTasks(newTasks);
   }
   
   // RENDER
@@ -124,9 +143,9 @@ function App() {
         {/* Bottom Container */}
         <div className="container-bottom"> 
           {/* List of tasks */}
-          
-          <TasksList t={tasks} selectTask={selectTask} addTask={addTask} />
-          
+
+          <TasksList t={tasks} selectTask={selectTask} addTask={addTask} delTask={delTask} runTask={runTask}/>
+
           {/* Task description */}
           {selectedItem && (
             <form className="task-description" datatype="taskModel">
@@ -139,8 +158,8 @@ function App() {
               <div className="task-regex-patterns-container">
                 <textarea className="task-regex-patterns-input" value={selectedItem.regex_patterns.join("\n")} placeholder="Wzory plików" name="task-regex-patterns" onChange={handleChange}/>
               </div>
-              <div className="task-folder-paths-container">
-                <textarea className="task-folder-paths-input" value={selectedItem.folder_paths.join("\n")} placeholder="Ścieżki folderów" name="task-folder-paths" onChange={handleChange}/>
+              <div className="task-folder-path-container">
+                <textarea className="task-folder-path-input" value={selectedItem.folder_path} placeholder="Ścieżka folderu" name="task-folder-path" onChange={handleChange}/>
               </div>
             
               <div className="task-auto-run-container">

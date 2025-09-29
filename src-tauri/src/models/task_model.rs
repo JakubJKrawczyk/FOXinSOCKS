@@ -18,7 +18,7 @@ pub struct TaskModel{
     pub task_process_id: u32,
     pub status: TaskStatus,
     pub regex_patterns: Vec<String>,
-    pub folder_paths: Vec<String>,
+    pub folder_path: String,
     pub number_of_dup_to_keep: u8,
 }
 
@@ -32,7 +32,7 @@ impl TaskModel{
         task_process_id: u32,
         status: TaskStatus,
         regex_patterns: Vec<String>,
-        folder_paths: Vec<String>,
+        folder_path: String,
         number_of_dup_to_keep: u8
     ) -> TaskModel{
         TaskModel {
@@ -44,7 +44,7 @@ impl TaskModel{
             task_process_id: task_process_id,
             status: status,
             regex_patterns: regex_patterns,
-            folder_paths: folder_paths,
+            folder_path: folder_path,
             number_of_dup_to_keep: number_of_dup_to_keep
         }
     }

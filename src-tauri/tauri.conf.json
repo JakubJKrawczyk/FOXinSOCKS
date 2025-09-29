@@ -5,7 +5,6 @@
   "identifier": "saldo.foxinsocks.cleaner",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
@@ -16,10 +15,7 @@
         "minWidth": 1000,
         "minHeight": 600
       }
-    ],
-    "security": {
-      "csp": null
-    }
+    ]
   },
   "bundle": {
     "active": true,

@@ -159,7 +159,7 @@ body {
     width:90%;
   }
 
-  .task-folder-paths-container{
+  .task-folder-path-container{
     grid-row: 3;
     grid-column-start: 0;
     grid-column-end: span 4;
@@ -243,6 +243,26 @@ body {
 
  }
 
+ .task-item-del{
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 999;
+    display: block;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    justify-items: center;
+    align-items: center;
+    line-height: 20px;
+    border: 1px solid white;
+    border-radius: 50%;
+    font-size: 14px;
+ }  
+ .task-item-del:hover{
+    background-color: white;
+    color: red;
+    transition: 200ms all ease-in;
 
+ }
 
   /* End of Task Edit Box */
