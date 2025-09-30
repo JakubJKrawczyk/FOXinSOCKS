@@ -1,4 +1,5 @@
 use crate::controllers::clean_processes_controller::CleanProcessController;
+use crate::controllers::file_system_controller;
 use std::os::windows::process;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -196,7 +197,11 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
                 task.status = crate::models::task_model::TaskStatus::Idle;
                 let update_res = c.lock().unwrap().update_task(&task);
                 match update_res {
-                    Ok(_) => { logger::log("Task zaktualizowany"); Ok(()) },
+                    Ok(_) => { 
+                        logger::log("Task zaktualizowany");
+                        let _ = file_system_controller::save_tasks(&c.lock().unwrap().tasks);
+                         Ok(()) 
+                        },
                     Err(e) => { logger::error(format!("Błąd aktualizacji taska: {}", e)); Err(String::from("Błąd przy aktualizacji taska")) }
                 }
             } else {
