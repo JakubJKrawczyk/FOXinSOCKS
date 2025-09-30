@@ -103,9 +103,9 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
         let ctrl = CONTROLLER.get().unwrap().lock().unwrap();
         let task = ctrl.get_task(&task_id).cloned();
         drop(ctrl);
-        if let Some(task_ref) = task {
+        if let Some(mut task_ref) = task {
             let mut c = CONTROLLER.get().unwrap().lock().unwrap();
-            match c.create_process(&task_ref) {
+            match c.create_process(&mut task_ref) {
                 Ok(_) => { logger::log("Proces dla taska uruchomiony"); Ok(()) },
                 Err(e) => { logger::error(format!("Błąd tworzenia procesu: {}", e)); Err(String::from("Błąd tworzenia procesu dla taska")) }
             }
@@ -127,9 +127,16 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
         let task_exists = ctrl.get_task(&task_id).is_some();
         drop(ctrl);
         if task_exists {
-            let c = CONTROLLER.get().unwrap().lock().unwrap();
+            let mut c = CONTROLLER.get().unwrap().lock().unwrap();
             match c.stop_process(&task_id) {
-                Ok(_) => { logger::log("Proces taska zatrzymany"); Ok(()) },
+                Ok(_) => { 
+                    logger::log("Proces taska zatrzymany"); 
+                     let mut task = c.get_task(&task_id).unwrap().clone();
+                   
+                        task.status = crate::models::task_model::TaskStatus::Idle;
+                        c.update_task(&task).ok();
+                    
+                    Ok(()) },
                 Err(e) => { logger::error(format!("Błąd zatrzymywania procesu: {}", e)); Err(String::from("Błąd zatrzymywania procesu dla taska")) }
             }
         } else {

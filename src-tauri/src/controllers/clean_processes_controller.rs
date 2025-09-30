@@ -1,5 +1,5 @@
 use tokio::task;
-use crate::models::task_model::TaskModel;
+use crate::models::task_model::{TaskModel, TaskStatus};
 use crate::models::task_process_model::TaskProcessModel;
 use crate::controllers::file_system_controller;
 use std::path::Path;
@@ -46,8 +46,9 @@ impl CleanProcessController{
         }else{ Err(String::from("W systemie istnieje już task o takim Id")) }
     }
 
-    pub fn create_process(&mut self, task_model: &TaskModel) -> Result<(), String>{
+    pub fn create_process(&mut self, task_model: &mut TaskModel) -> Result<(), String>{
         if !self.tasks_processes.iter().any(|tp| tp.task_id == task_model.id){
+
             let new_entry = TaskProcessModel::new(
                 task::spawn(cleaning_command(
                     task_model.regex_patterns.clone(),
@@ -58,13 +59,16 @@ impl CleanProcessController{
                 task_model.id.clone()
             );
             self.tasks_processes.push(new_entry);
+            task_model.status = TaskStatus::Sheduled;
+            self.update_task(task_model).ok();
             Ok(())
-        }else{ Err(String::from("Nie udało się utworzyć procesu dla zadania!")) }
+        }else{ Err(String::from("Task znajduje się już w procesach")) }
     }
 
-    pub fn stop_process(&self, task_id: &str) -> Result<(), String>{
+    pub fn stop_process(&mut self, task_id: &str) -> Result<(), String>{
         if let Some(task_process) = self.tasks_processes.iter().find(|task| task.task_id == task_id){
             if !task_process.process.is_finished() { task_process.process.abort(); }
+            self.tasks_processes.retain(|tp| tp.task_id != task_id);
             Ok(())
         }else{ Err(String::from("Błąd podczas zatrzymywania procesu")) }
     }

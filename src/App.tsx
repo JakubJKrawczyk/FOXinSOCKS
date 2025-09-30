@@ -151,6 +151,15 @@ function App() {
     console.log("Running task with id: " + id);
     const res = await controller.runTask(id);
     if(!res.ok){ console.error('Błąd uruchamiania:', res.error); }
+    else console.log("Task uruchomiony: " + id);
+    await refreshTasks();
+  }
+
+  async function stopTask(id: string){
+    console.log("Stopping task with id: " + id);
+    const res = await controller.stopTask(id);
+    if(!res.ok){ console.error('Błąd zatrzymywania:', res.error); }
+    else console.log("Task zatrzymany: " + id);
     await refreshTasks();
   }
   
@@ -168,7 +177,7 @@ function App() {
         <div className="container-bottom"> 
           {/* List of tasks */}
 
-          <TasksList t={tasks} selectTask={selectTask} addTask={newTask} delTask={delTask} runTask={runTask}/>
+          <TasksList t={tasks} selectTask={selectTask} addTask={newTask} delTask={delTask} runTask={runTask} stopTask={stopTask}/>
 
           {/* Task description */}
           {selectedItem && (

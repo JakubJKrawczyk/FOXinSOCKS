@@ -6,10 +6,10 @@ interface TasksListProps{
   addTask: () => void;
   delTask: (id: string) => void;
   runTask: (id: string) => void;
-  pauseTask?: (id: string) => void; // opcjonalnie – jeśli nie podane, przycisk Pause nie działa
+  stopTask?: (id: string) => void; // opcjonalnie – jeśli nie podane, przycisk Stop nie działa
 }
 
-export default function TasksList({ t, selectTask, addTask, delTask, runTask, pauseTask }: TasksListProps){
+export default function TasksList({ t, selectTask, addTask, delTask, runTask, stopTask }: TasksListProps){
        /**
      *
      */
@@ -26,7 +26,7 @@ export default function TasksList({ t, selectTask, addTask, delTask, runTask, pa
                   const onRunPauseClick = (e: React.MouseEvent) => {
                     e.stopPropagation();
                     if (isRunning) {
-                      pauseTask && pauseTask(task.id);
+                      stopTask && stopTask(task.id);
                     } else {
                       runTask(task.id);
                     }
