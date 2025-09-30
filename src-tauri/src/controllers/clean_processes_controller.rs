@@ -1,7 +1,10 @@
 use tokio::task;
+use crate::commands::commands::run_task;
 use crate::models::task_model::{TaskModel, TaskStatus};
 use crate::models::task_process_model::TaskProcessModel;
 use crate::controllers::file_system_controller;
+use crate::run;
+use crate::utills::logger;
 use std::path::Path;
 use regex::Regex;
 use std::collections::HashMap;
@@ -75,32 +78,43 @@ impl CleanProcessController{
 }
 
 async fn cleaning_command(regex_patterns: Vec<String>, folder_path: String, interval: u32, dup_to_leave: u8){
+    
     loop {
         let folder_path_path = Path::new(&folder_path);
         if !folder_path_path.exists() || !folder_path_path.is_dir() {
+            logger::process(" Ścieżka do folderu jest niepoprawna, folder nie istnieje lub nie jest to folder! Process wstrzymany");
             sleep(Duration::from_secs(interval as u64)).await;
             continue;
         }
+
+        logger::process(" Rozpoczynanie procesu czyszczenia");
+        logger::process(format!(" {} wzorców do przetworzenia", regex_patterns.len()));
+
         for regex_str in &regex_patterns {
             let re = match Regex::new(regex_str) { Ok(r) => r, Err(_) => continue };
             let mut file_groups: HashMap<String, Vec<(String, std::time::SystemTime)>> = HashMap::new();
+            logger::process(format!("Znaleziono {} plików dla regexu {}", WalkDir::new(folder_path_path).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file()).count(), regex_str));
             for entry in WalkDir::new(folder_path_path).into_iter().filter_map(|e| e.ok()) {
                 if !entry.file_type().is_file(){ continue; }
                 let file_name = entry.file_name().to_string_lossy().to_string();
                 if re.is_match(&file_name) {
                     if let Ok(metadata) = entry.metadata() { if let Ok(modified) = metadata.modified() {
-                        file_groups.entry(file_name.clone()).or_default().push((entry.path().to_string_lossy().to_string(), modified));
+                        file_groups.entry(regex_str.clone()).or_default().push((entry.path().to_string_lossy().to_string(), modified));
                     }}
                 }
             }
             for (_name, mut files) in file_groups { // cleanup
+                logger::process(format!("Usuwanie plików dla regex {}", _name));
                 files.sort_by_key(|f| f.1);
                 if files.len() > dup_to_leave as usize {
                     let to_delete = files.len() - dup_to_leave as usize;
-                    for (path, _) in files.into_iter().take(to_delete) { let _ = fs::remove_file(path); }
+                    for (path, _) in files.into_iter().take(to_delete) { 
+                        logger::process(format!("[{}] Usuwanie pliku {}", _name, path));
+                        let _ = fs::remove_file(path); }
                 }
             }
         }
-        sleep(Duration::from_secs(interval as u64)).await;
+        logger::process(" Czyszczenie zakończone. Process przechodzi w tryb wstrzymania.");
+        sleep(Duration::from_secs((interval as u64) * 60)).await;
     }
 }

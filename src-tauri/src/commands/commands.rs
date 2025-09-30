@@ -1,4 +1,5 @@
 use crate::controllers::clean_processes_controller::CleanProcessController;
+use std::os::windows::process;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -19,7 +20,21 @@ pub async fn init() -> Result<(), String> {
         Ok(_) => {
             INITIALIZED.store(true, Ordering::SeqCst);
             logger::log("Backend zainicjalizowany poprawnie");
-            Ok(())
+        logger::log("Uruchamianie tasków z auto run");
+        // Zbieramy kopie tasków z auto_run aby uniknąć podwójnych mutable borrow
+        let auto_run_tasks: Vec<TaskModel> = {
+            let c = CONTROLLER.get().unwrap().lock().unwrap();
+            c.tasks.iter().filter(|t| t.auto_run).cloned().collect()
+        };
+        // Dla każdego taska tworzymy proces używając osobnej mutable blokady
+        for mut task_clone in auto_run_tasks {
+            let mut c = CONTROLLER.get().unwrap().lock().unwrap();
+            let res = c.create_process(&mut task_clone);
+            if res.is_err() {
+                return Err(String::from("Błąd uruchamiania tasków podczas inicjalizacji!"));
+            }
+        }
+        Ok(())
         },
         Err(_) => {
             logger::error("Nie udało się ustawić kontrolera (OnceLock)");
@@ -32,10 +47,16 @@ pub async fn init() -> Result<(), String> {
 pub async fn get_tasks() -> Result<Vec<TaskModel>, String>{
     if INITIALIZED.load(Ordering::SeqCst) {
     logger::log("Pobieranie listy tasków");
-        let tasks = CONTROLLER.get().unwrap().lock().unwrap().tasks.clone();
-        // Log pełnej listy jako JSON (jedna linia) + liczność
+    let tasks = CONTROLLER.get().unwrap().lock().unwrap().tasks.clone();
+    let tasks_processes = &CONTROLLER.get().unwrap().lock().unwrap().tasks_processes;
+    // Log pełnej listy jako JSON (jedna linia) + liczność
         match serde_json::to_string(&tasks) {
-            Ok(json) => logger::log(format!("Lista tasków ({}): {}", tasks.len(), json)),
+            Ok(json) => {
+            logger::log(format!("Lista tasków ({}): {}", tasks.len(), json));
+            let processes = serde_json::to_string(&tasks_processes).unwrap();
+            logger::log(format!("Lista procesów ({}): {}", tasks_processes.len(), processes));
+
+            },
             Err(e) => logger::warning(format!("Nie udało się zserializować listy tasków: {}", e)),
         }
         Ok(tasks)
@@ -84,7 +105,9 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
  #[tauri::command]
  pub async fn del_task(task_id: String) -> Result<(), String>{
     if INITIALIZED.load(Ordering::SeqCst) {
-    logger::log(format!("Usuwanie taska id={}", task_id));
+        logger::log(format!("Usuwanie taska id={}", task_id));
+        let _ = CONTROLLER.get().unwrap().lock().unwrap().stop_process(&task_id);
+        
         let res = CONTROLLER.get().unwrap().lock().unwrap().delete_task(&task_id);
         match res {
             Ok(_) => { logger::log("Usunięto task"); Ok(()) },
@@ -104,6 +127,10 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
         let task = ctrl.get_task(&task_id).cloned();
         drop(ctrl);
         if let Some(mut task_ref) = task {
+            if task_ref.folder_path == "" || task_ref.regex_patterns.len() == 0 {
+                logger::error("Próba uruchomienia taska bez sprecyzowanej sciezki oraz wzorców!");
+                return Err(String::from("Aby uruchomić zadanie należy uzupełnić ścieżkę do folderu, wwzorce folderów."))
+            }
             let mut c = CONTROLLER.get().unwrap().lock().unwrap();
             match c.create_process(&mut task_ref) {
                 Ok(_) => { logger::log("Proces dla taska uruchomiony"); Ok(()) },
@@ -150,8 +177,10 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
  }
 
  #[tauri::command]
- pub async fn update_task(task: TaskModel) -> Result<(), String>{
+ pub async fn update_task(mut task: TaskModel) -> Result<(), String>{
+ 
     if INITIALIZED.load(Ordering::SeqCst) {
+
     logger::log(format!("Aktualizacja taska id={}", task.id));
         let ctrl = CONTROLLER.get().unwrap().lock().unwrap();
         let backend_task = ctrl.get_task(&task.id).cloned();
@@ -160,9 +189,11 @@ pub async fn get_task(task_id: String) -> Result<TaskModel, String>{
             // zatrzymaj proces (jeśli działa)
             if let Some(c) = CONTROLLER.get() {
                 let stop_res = c.lock().unwrap().stop_process(&old_task.id);
+                
                 if let Err(e) = stop_res { logger::warning(format!("Nie udało się zatrzymać procesu przed aktualizacją: {}", e)); }
             }
             if let Some(c) = CONTROLLER.get() {
+                task.status = crate::models::task_model::TaskStatus::Idle;
                 let update_res = c.lock().unwrap().update_task(&task);
                 match update_res {
                     Ok(_) => { logger::log("Task zaktualizowany"); Ok(()) },

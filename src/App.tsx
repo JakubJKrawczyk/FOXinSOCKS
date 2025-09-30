@@ -6,10 +6,19 @@ import TasksController from "./backend/utilities/tasksController";
 
 function App() {
 
+    const [refreshRunning, setrefreshRunning] = useState<boolean>(false);
+
+    if(!refreshRunning){
+      runTaskWithInterval(refreshTasks, 5000);
+      setrefreshRunning(true);
+    }
+
     // VARIABLES
 
     const [selectedItem, setSelectedItem] = useState<taskModel | null>(null);
-    const [tasks, setTasks] = useState<taskModel[]>([]);
+  const [tasks, setTasks] = useState<taskModel[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorTimerId, setErrorTimerId] = useState<number | null>(null);
 
     const controller = new TasksController();
   // END OF VARIABLES
@@ -33,13 +42,55 @@ function App() {
     selectFrontItem(element)
   },[tasks]);
 
+  // helper to show error toast
+  function showError(msg: string){
+    console.error(msg);
+    setErrorMsg(msg);
+  }
+
+  // auto hide error after 5s
+  useEffect(() => {
+    if(errorMsg){
+      if(errorTimerId){ clearTimeout(errorTimerId); }
+      const id = window.setTimeout(() => setErrorMsg(null), 5000);
+      setErrorTimerId(id);
+    }
+  }, [errorMsg]);
+
+  // global listeners for unexpected errors
+  useEffect(() => {
+    const onWindowError = (e: ErrorEvent) => { showError(e.message || "Nieznany błąd (window error)"); };
+    const onUnhandled = (e: PromiseRejectionEvent) => { showError(e.reason?.toString?.() || "Unhandled promise rejection"); };
+    window.addEventListener('error', onWindowError);
+    window.addEventListener('unhandledrejection', onUnhandled);
+    // przechwycenie console.error (dowolny błąd z konsoli też pokaże toast)
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      try { showError(args.map(a => (typeof a === 'string' ? a : (a?.message || a?.toString?.() || ''))).join(' ')); } catch(_) {}
+      originalConsoleError(...args);
+    };
+    // skrót klawiszowy Ctrl+Shift+E -> testowy toast
+    const keyHandler = (e: KeyboardEvent) => {
+      if(e.ctrlKey && e.shiftKey && (e.key === 'E' || e.key === 'e')){
+        showError('Testowy błąd (CTRL+SHIFT+E)');
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+    return () => {
+      window.removeEventListener('error', onWindowError);
+      window.removeEventListener('unhandledrejection', onUnhandled);
+      window.removeEventListener('keydown', keyHandler);
+      console.error = originalConsoleError;
+    };
+  }, []);
+
   // Initial backend init + load tasks + log path
   useEffect(() => {
     (async () => {
       const initRes = await controller.init();
-      if(!initRes.ok){ console.warn("Init backend error:", initRes.error); }
+      if(!initRes.ok){ showError("Init backend error: " + initRes.error); }
       const tasksRes = await controller.getTasks();
-      if(tasksRes.ok && 'data' in tasksRes){ setTasks(tasksRes.data); } else { console.warn("Pobieranie tasków nieudane"); }
+      if(tasksRes.ok && 'data' in tasksRes){ setTasks(tasksRes.data); } else { showError("Pobieranie tasków nieudane"); }
       const logRes = await controller.getLogPath();
       if(logRes.ok && 'data' in logRes){ console.log("Ścieżka pliku logu:", logRes.data); }
     })();
@@ -47,13 +98,34 @@ function App() {
   }, []);
 
   // FUNCTIONS
+
+
+  function runTaskWithInterval(task: () => Promise<void>, interval: number): void {
+    let isRunning = false;
+
+    setInterval(async () => {
+      console.log("Odświeżanie listy tasków.")
+
+        if (isRunning) {
+            console.log("Task is already running. Skipping this interval.");
+            return;
+        }
+
+        isRunning = true;
+        try {
+            await task(); // Run the async task
+        } catch (error) {
+            console.error("Error occurred during task execution:", error);
+        } finally {
+            isRunning = false; // Reset the flag after task completion
+        }
+    }, interval);
+}
+
   async function refreshTasks(){
     const res = await controller.getTasks();
-    if(res.ok && 'data' in res){
-      setTasks(res.data);
-    }else{
-      console.warn('Nie udało się pobrać tasków po operacji');
-    }
+    if(res.ok && 'data' in res){ setTasks(res.data); }
+    else { showError('Nie udało się pobrać tasków po operacji'); }
   }
 
   function selectFrontItem(element: HTMLElement | null){
@@ -80,8 +152,10 @@ function App() {
   async function updateTask() {
     if(!selectedItem) return;
     console.log("Updating task...", selectedItem.id);
+    selectedItem.regex_patterns = selectedItem.regex_patterns.filter(pattern => pattern.length > 0);
+    selectedItem.folder_path = selectedItem.folder_path.trim();
     const res = await controller.updateTask(selectedItem);
-    if(!res.ok){ console.error('Błąd aktualizacji backend:', res.error); }
+    if(!res.ok){ showError('Błąd aktualizacji backend: ' + res.error); }
     await refreshTasks();
   };
 
@@ -112,7 +186,7 @@ function App() {
           updated.number_of_dup_to_keep = Number(value);
           break;
         case "task-regex-patterns":
-          updated.regex_patterns = value.split("\n").map(pattern => pattern.trim()).filter(pattern => pattern.length > 0);
+          updated.regex_patterns = value.split("\n");
           break;
         case "task-folder-path":
           updated.folder_path = value;
@@ -127,10 +201,7 @@ function App() {
   async function newTask(){
     console.log("Adding new task");
     const res = await controller.addTask();
-    if(!res.ok){
-      console.error('Błąd dodawania na backend:', res.error);
-      return;
-    }
+    if(!res.ok){ showError('Błąd dodawania na backend: ' + res.error); return; }
     // Użyj obiektu z backendu aby ID było spójne
     const backendTask = 'data' in res ? res.data : null;
     await refreshTasks();
@@ -142,7 +213,7 @@ function App() {
   async function delTask(id: string){
     console.log("Deleting task with id: " + id);
     const res = await controller.delTask(id);
-    if(!res.ok){ console.error('Błąd usuwania:', res.error); }
+  if(!res.ok){ showError('Błąd usuwania: ' + res.error); }
     await refreshTasks();
     if(selectedItem && selectedItem.id === id){ setSelectedItem(null); }
   }
@@ -150,7 +221,7 @@ function App() {
   async function runTask(id: string){
     console.log("Running task with id: " + id);
     const res = await controller.runTask(id);
-    if(!res.ok){ console.error('Błąd uruchamiania:', res.error); }
+  if(!res.ok){ showError('Błąd uruchamiania: ' + res.error); }
     else console.log("Task uruchomiony: " + id);
     await refreshTasks();
   }
@@ -158,7 +229,7 @@ function App() {
   async function stopTask(id: string){
     console.log("Stopping task with id: " + id);
     const res = await controller.stopTask(id);
-    if(!res.ok){ console.error('Błąd zatrzymywania:', res.error); }
+  if(!res.ok){ showError('Błąd zatrzymywania: ' + res.error); }
     else console.log("Task zatrzymany: " + id);
     await refreshTasks();
   }
@@ -215,6 +286,12 @@ function App() {
           )}
           </div>
       </div>
+      {errorMsg && (
+        <div className="error-toast" role="alert" aria-live="assertive" onClick={() => setErrorMsg(null)}>
+          <span className="error-toast-msg">{errorMsg}</span>
+          <button className="error-toast-close" type="button" onClick={(e) => { e.stopPropagation(); setErrorMsg(null); }}>×</button>
+        </div>
+      )}
     </main>
   );
 }

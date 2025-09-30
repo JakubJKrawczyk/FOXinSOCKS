@@ -1,6 +1,9 @@
 use tokio::task;
+use serde::{Serialize};
 
+#[derive(Serialize)]
 pub struct TaskProcessModel{
+    #[serde(skip_serializing, skip_deserializing)]
     pub process: task::JoinHandle<()>,
     pub task_id: String
 }

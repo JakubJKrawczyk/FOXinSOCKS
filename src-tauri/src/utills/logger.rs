@@ -10,15 +10,16 @@ const GRAY: &str = "\x1b[90m";
 const YELLOW: &str = "\x1b[33m";
 const RED: &str = "\x1b[31m";
 const RESET: &str = "\x1b[0m";
+const BLUE: &str = "\x1b[34m"; // PROCESS
 
-enum Level { Log, Warning, Error }
+enum Level { Log, Warning, Error, Process }
 
 impl Level {
 	fn as_str(&self) -> &'static str {
-		match self { Level::Log => "LOG", Level::Warning => "WARNING", Level::Error => "ERROR" }
+		match self { Level::Log => "LOG", Level::Warning => "WARNING", Level::Error => "ERROR", Level::Process => "PROCESS" }
 	}
 	fn color(&self) -> &'static str {
-		match self { Level::Log => GRAY, Level::Warning => YELLOW, Level::Error => RED }
+		match self { Level::Log => GRAY, Level::Warning => YELLOW, Level::Error => RED, Level::Process => BLUE }
 	}
 }
 
@@ -65,3 +66,4 @@ fn write_line(level: Level, message: &str) {
 pub fn log<M: AsRef<str>>(message: M) { write_line(Level::Log, message.as_ref()); }
 pub fn warning<M: AsRef<str>>(message: M) { write_line(Level::Warning, message.as_ref()); }
 pub fn error<M: AsRef<str>>(message: M) { write_line(Level::Error, message.as_ref()); }
+pub fn process<M: AsRef<str>>(message: M) { write_line(Level::Process, message.as_ref()); }
