@@ -1,8 +1,8 @@
-mod controllers;
+pub mod controllers;
 mod data;
-mod models;
+pub mod models;
 mod commands;
-mod utills; // logger & inne utils
+pub mod utills; // logger & inne utils
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 #[tauri::command]
