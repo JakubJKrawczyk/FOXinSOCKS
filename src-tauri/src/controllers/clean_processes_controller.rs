@@ -1,15 +1,13 @@
 use tokio::task;
-use crate::commands::commands::run_task;
 use crate::models::task_model::{TaskModel, TaskStatus};
 use crate::models::task_process_model::TaskProcessModel;
 use crate::controllers::file_system_controller;
-use crate::run;
 use crate::utills::logger;
 use std::path::Path;
 use regex::Regex;
-use std::collections::HashMap;
-use walkdir::WalkDir;
+use std::collections::HashSet;
 use std::fs;
+use std::time::SystemTime;
 use tokio::time::{sleep, Duration};
 
 pub struct CleanProcessController{
@@ -78,43 +76,90 @@ impl CleanProcessController{
 }
 
 async fn cleaning_command(regex_patterns: Vec<String>, folder_path: String, interval: u32, dup_to_leave: u8){
-    
+    // Interpretacja: interval w minutach (spójnie) – w przypadku błędnej ścieżki też czekamy pełny interwał.
+    let sleep_duration = Duration::from_secs(interval as u64 * 60);
+
+    // Prekompilacja regexów (pomijamy błędne)
+    let compiled_patterns: Vec<(String, Regex)> = regex_patterns.iter()
+        .filter_map(|p| Regex::new(p).ok().map(|r| (p.clone(), r)))
+        .collect();
+
     loop {
-        let folder_path_path = Path::new(&folder_path);
-        if !folder_path_path.exists() || !folder_path_path.is_dir() {
-            logger::process(" Ścieżka do folderu jest niepoprawna, folder nie istnieje lub nie jest to folder! Process wstrzymany");
-            sleep(Duration::from_secs(interval as u64)).await;
+        let base_path = Path::new(&folder_path);
+        if !base_path.exists() || !base_path.is_dir(){
+            logger::process("Ścieżka do folderu jest niepoprawna, folder nie istnieje lub nie jest to folder. Wstrzymanie do następnej próby.");
+            sleep(sleep_duration).await;
             continue;
         }
 
-        logger::process(" Rozpoczynanie procesu czyszczenia");
-        logger::process(format!(" {} wzorców do przetworzenia", regex_patterns.len()));
+        logger::process(format!("Start czyszczenia – {} wzorców", compiled_patterns.len()));
 
-        for regex_str in &regex_patterns {
-            let re = match Regex::new(regex_str) { Ok(r) => r, Err(_) => continue };
-            let mut file_groups: HashMap<String, Vec<(String, std::time::SystemTime)>> = HashMap::new();
-            logger::process(format!("Znaleziono {} plików dla regexu {}", WalkDir::new(folder_path_path).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file()).count(), regex_str));
-            for entry in WalkDir::new(folder_path_path).into_iter().filter_map(|e| e.ok()) {
-                if !entry.file_type().is_file(){ continue; }
-                let file_name = entry.file_name().to_string_lossy().to_string();
-                if re.is_match(&file_name) {
-                    if let Ok(metadata) = entry.metadata() { if let Ok(modified) = metadata.modified() {
-                        file_groups.entry(regex_str.clone()).or_default().push((entry.path().to_string_lossy().to_string(), modified));
-                    }}
-                }
-            }
-            for (_name, mut files) in file_groups { // cleanup
-                logger::process(format!("Usuwanie plików dla regex {}", _name));
-                files.sort_by_key(|f| f.1);
-                if files.len() > dup_to_leave as usize {
-                    let to_delete = files.len() - dup_to_leave as usize;
-                    for (path, _) in files.into_iter().take(to_delete) { 
-                        logger::process(format!("[{}] Usuwanie pliku {}", _name, path));
-                        let _ = fs::remove_file(path); }
+        // 1. Zbierz unikalne "rodziny" plików (jak w GetUniqueFilesNames z C#).
+        let mut families: HashSet<String> = HashSet::new();
+        let dir_iter = match fs::read_dir(base_path){ Ok(it) => it, Err(_) => { sleep(sleep_duration).await; continue; } };
+
+        // Zebrane nazwy plików (przyda się ponownie)
+        let mut entries_cache: Vec<(String, SystemTime)> = Vec::new();
+
+        for entry_res in dir_iter {
+            if let Ok(entry) = entry_res {
+                if let Ok(ft) = entry.file_type() { if !ft.is_file() { continue; } }
+                let path_buf = entry.path();
+                let file_name = match path_buf.file_name().and_then(|n| n.to_str()) { Some(n) => n.to_string(), None => continue };
+                // Precache czasy (creation -> fallback modified)
+                let ctime = entry.metadata().ok()
+                    .and_then(|md| md.created().or_else(|_| md.modified()).ok())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+                entries_cache.push((file_name.clone(), ctime));
+
+                for (pattern_str, re) in &compiled_patterns {
+                    if let Some(m) = re.find(&file_name) { // dopasowanie w samej nazwie
+                        let mut family_key = if pattern_str == "^.*_\\d{2}\\." {
+                            let matched = &file_name[m.start()..m.end()];
+                            if matched.len() > 3 { matched[..matched.len()-3].to_string() } else { matched.to_string() }
+                        } else {
+                            // pełna nazwa pliku jako rodzina (odwzorowanie pierwotnej logiki C#)
+                            file_name.clone()
+                        };
+                        if family_key.is_empty() { family_key = file_name.clone(); }
+                        families.insert(family_key);
+                    }
                 }
             }
         }
-        logger::process(" Czyszczenie zakończone. Process przechodzi w tryb wstrzymania.");
-        sleep(Duration::from_secs((interval as u64) * 60)).await;
+
+        logger::process(format!("Zidentyfikowano {} rodzin plików", families.len()));
+
+        // 2. Dla każdej rodziny zbierz pasujące pliki (contains) i usuń starsze zostawiając dup_to_leave najnowszych.
+        for family in families.into_iter() {
+            // Zbierz pliki pasujące (contains)
+            let mut family_files: Vec<(String, SystemTime)> = entries_cache.iter()
+                .filter(|(name, _)| name.contains(&family))
+                .map(|(n, t)| (n.clone(), *t))
+                .collect();
+
+            if family_files.len() as u8 <= dup_to_leave { continue; }
+
+            // Sortuj od najnowszych do najstarszych (jak C# po reverse)
+            family_files.sort_by_key(|(_, t)| *t); // rosnąco (najstarsze pierwsze)
+            family_files.reverse(); // teraz najnowsze pierwsze
+
+            let to_delete = family_files.len().saturating_sub(dup_to_leave as usize);
+            if to_delete == 0 { continue; }
+            logger::process(format!("[{}] Plików: {}, do usunięcia: {}", family, family_files.len(), to_delete));
+
+            for (idx, _) in family_files.iter().enumerate() {
+                if idx >= to_delete { break; }
+            }
+            // Po odwróceniu najnowsze są na początku – chcemy zostawić dup_to_leave pierwszych, więc kasujemy od indeksu dup_to_leave wzwyż.
+            for (file_name, _) in family_files.iter().skip(dup_to_leave as usize) {
+                let full_path = base_path.join(file_name);
+                logger::process(format!("[{}] Usuwanie pliku {}", family, full_path.to_string_lossy()));
+                let _ = fs::remove_file(full_path);
+            }
+        }
+
+        logger::process("Czyszczenie zakończone – oczekiwanie do następnego interwału.");
+        sleep(sleep_duration).await;
     }
 }
