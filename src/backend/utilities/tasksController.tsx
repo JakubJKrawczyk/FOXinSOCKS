@@ -52,6 +52,14 @@ class TasksController {
     async getLogPath(){
         return this.call<string>("get_log_path");
     }
+
+    async getLogs(){
+        return this.call<string>("get_all_logs");
+    }
+
+    async getLogTail(lines: number){
+        return this.call<string>("get_log_tail", { lines });
+    }
 }
 
 export default TasksController;

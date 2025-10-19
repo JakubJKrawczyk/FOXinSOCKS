@@ -3,6 +3,7 @@ import {taskModel, TaskStatus} from "./backend/models/taskModel";
 import { useEffect, useState  } from "react";
 import TasksList from "./components/TasksList";
 import TasksController from "./backend/utilities/tasksController";
+import LogDrawer from "./components/LogDrawer";
 
 function App() {
 
@@ -19,6 +20,9 @@ function App() {
   const [tasks, setTasks] = useState<taskModel[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [errorTimerId, setErrorTimerId] = useState<number | null>(null);
+  const [showLogDrawer, setShowLogDrawer] = useState<boolean>(false);
+  const [logText, setLogText] = useState<string>("");
+  const [logAutoScroll, setLogAutoScroll] = useState<boolean>(true);
 
     const controller = new TasksController();
   // END OF VARIABLES
@@ -233,6 +237,31 @@ function App() {
     else console.log("Task zatrzymany: " + id);
     await refreshTasks();
   }
+
+  // Pobieranie logów (cała zawartość pliku) – wywoływane przy otwieraniu oraz w interwale.
+  async function fetchLogs(){
+    // pobieramy tylko ostatnie 400 linii dla oszczędności pamięci
+    const res = await controller.getLogTail(400);
+    if(res.ok && 'data' in res){
+      setLogText(res.data);
+    }
+  }
+
+  // Auto-refresh logów kiedy szuflada otwarta (co 0.5 sekundy)
+  useEffect(() => {
+    if(!showLogDrawer) return;
+    // pierwsze pobranie
+    fetchLogs();
+    const interval = window.setInterval(fetchLogs, 500); // co 0.5 sekundy
+    return () => window.clearInterval(interval);
+  }, [showLogDrawer]);
+
+  // Po zamknięciu szuflady zwolnij pamięć
+  useEffect(() => {
+    if(!showLogDrawer){
+      setLogText("");
+    }
+  }, [showLogDrawer]);
   
   // RENDER
   return (
@@ -243,6 +272,14 @@ function App() {
         <div className="container-top" > 
           <h1 className="title">Fox in Socks</h1>
           <p className="subtitle">A simple cleaner at your service</p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" onClick={() => setShowLogDrawer(s => !s)}>
+              {showLogDrawer ? 'Ukryj logi' : 'Pokaż logi'}
+            </button>
+            {showLogDrawer && (
+              <button type="button" onClick={() => fetchLogs()}>Odśwież logi</button>
+            )}
+          </div>
         </div>
         {/* Bottom Container */}
         <div className="container-bottom"> 
@@ -292,6 +329,7 @@ function App() {
           <button className="error-toast-close" type="button" onClick={(e) => { e.stopPropagation(); setErrorMsg(null); }}>×</button>
         </div>
       )}
+  <LogDrawer open={showLogDrawer} logs={logText} onClose={() => setShowLogDrawer(false)} autoScroll={logAutoScroll} setAutoScroll={setLogAutoScroll} />
     </main>
   );
 }

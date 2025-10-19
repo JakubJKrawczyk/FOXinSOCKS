@@ -312,3 +312,51 @@ body {
  }
 
   /* End of Task Edit Box */
+
+/* Log Drawer */
+.log-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 0;
+  background: #1f1f1f;
+  border-left: 1px solid #444;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: width 250ms ease-in-out;
+  z-index: 4000;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.4);
+}
+.log-drawer.open { width: 40vw; }
+.log-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #242424;
+  border-bottom: 1px solid #444;
+  font-weight: bold;
+}
+.log-drawer-close {
+  background: transparent !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 1.2rem;
+  cursor: pointer !important;
+}
+.log-drawer-close:hover { color: #ffb4b4 !important; }
+.log-drawer-content {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  background: #1f1f1f;
+  color: #e9e9e9;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  scrollbar-color: #444 transparent;
+}
+/* Koniec Log Drawer */

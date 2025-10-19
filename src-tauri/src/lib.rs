@@ -10,6 +10,36 @@ fn get_log_path() -> String {
     crate::utills::logger::current_log_file_path()
 }
 
+// Zwraca pełną zawartość aktualnego pliku logów.
+// Jeśli plik nie istnieje (np. jeszcze nic nie zalogowano) zwraca pusty string.
+#[tauri::command]
+fn get_all_logs() -> String {
+    let path = crate::utills::logger::current_log_file_path();
+    match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(_) => String::new(),
+    }
+}
+
+// Zwraca ogon (ostatnie 'lines' linii) logu, czytając maksymalnie ~64KB z końca pliku
+#[tauri::command]
+fn get_log_tail(lines: usize) -> String {
+    use std::io::{Read, Seek, SeekFrom};
+    let path = crate::utills::logger::current_log_file_path();
+    let file = match std::fs::File::open(&path) { Ok(f) => f, Err(_) => return String::new() };
+    let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let window: u64 = 64 * 1024; // 64KB okno do odczytania z końca
+    let start = if size > window { size - window } else { 0 };
+    let mut f = file;
+    if start > 0 { let _ = f.seek(SeekFrom::Start(start)); }
+    let mut buf = String::new();
+    let _ = f.read_to_string(&mut buf);
+    let lines_vec: Vec<&str> = buf.lines().collect();
+    let len = lines_vec.len();
+    let start_line = if lines >= len { 0 } else { len - lines };
+    lines_vec[start_line..].join("\n")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     use crate::commands::commands::{init, get_tasks, get_task, add_task, del_task, run_task, stop_task, update_task};
@@ -36,7 +66,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![get_log_path, init, get_tasks, get_task, add_task, del_task, run_task, stop_task, update_task])
+    .invoke_handler(tauri::generate_handler![get_log_path, get_all_logs, get_log_tail, init, get_tasks, get_task, add_task, del_task, run_task, stop_task, update_task])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

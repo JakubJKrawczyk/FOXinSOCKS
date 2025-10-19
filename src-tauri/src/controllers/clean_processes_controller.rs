@@ -5,7 +5,7 @@ use crate::controllers::file_system_controller;
 use crate::utills::logger;
 use std::path::Path;
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashSet};
 use std::fs;
 use std::time::SystemTime;
 use tokio::time::{sleep, Duration};
@@ -76,89 +76,72 @@ impl CleanProcessController{
 }
 
 async fn cleaning_command(regex_patterns: Vec<String>, folder_path: String, interval: u32, dup_to_leave: u8){
-    // Interpretacja: interval w minutach (spójnie) – w przypadku błędnej ścieżki też czekamy pełny interwał.
     let sleep_duration = Duration::from_secs(interval as u64 * 60);
-
-    // Prekompilacja regexów (pomijamy błędne)
-    let compiled_patterns: Vec<(String, Regex)> = regex_patterns.iter()
-        .filter_map(|p| Regex::new(p).ok().map(|r| (p.clone(), r)))
-        .collect();
-
     loop {
         let base_path = Path::new(&folder_path);
         if !base_path.exists() || !base_path.is_dir(){
-            logger::process("Ścieżka do folderu jest niepoprawna, folder nie istnieje lub nie jest to folder. Wstrzymanie do następnej próby.");
+            logger::process("Ścieżka do folderu niepoprawna – wstrzymanie do następnego interwału.");
             sleep(sleep_duration).await;
             continue;
         }
-
-        logger::process(format!("Start czyszczenia – {} wzorców", compiled_patterns.len()));
-
-        // 1. Zbierz unikalne "rodziny" plików (jak w GetUniqueFilesNames z C#).
-        let mut families: HashSet<String> = HashSet::new();
-        let dir_iter = match fs::read_dir(base_path){ Ok(it) => it, Err(_) => { sleep(sleep_duration).await; continue; } };
-
-        // Zebrane nazwy plików (przyda się ponownie)
-        let mut entries_cache: Vec<(String, SystemTime)> = Vec::new();
-
-        for entry_res in dir_iter {
-            if let Ok(entry) = entry_res {
+        // 1. Bufor wszystkich plików (nazwa + mtime)
+        #[derive(Clone)]
+        struct FileInfo { name: String, path: String, modified: SystemTime }
+        let mut all: Vec<FileInfo> = Vec::new();
+        for e in fs::read_dir(base_path).unwrap_or_else(|_| fs::read_dir(base_path).unwrap()) {
+            if let Ok(entry) = e {
                 if let Ok(ft) = entry.file_type() { if !ft.is_file() { continue; } }
-                let path_buf = entry.path();
-                let file_name = match path_buf.file_name().and_then(|n| n.to_str()) { Some(n) => n.to_string(), None => continue };
-                // Precache czasy (creation -> fallback modified)
-                let ctime = entry.metadata().ok()
-                    .and_then(|md| md.created().or_else(|_| md.modified()).ok())
-                    .unwrap_or(SystemTime::UNIX_EPOCH);
-                entries_cache.push((file_name.clone(), ctime));
+                let name = match entry.file_name().to_str() { Some(s) => s.to_string(), None => continue };
+                let meta = entry.metadata().ok();
+                let mtime = meta.and_then(|m| m.modified().ok()).unwrap_or(SystemTime::UNIX_EPOCH);
+                all.push(FileInfo { name: name.clone(), path: entry.path().to_string_lossy().to_string(), modified: mtime });
+            }
+        }
+        logger::process(format!("[CLEAN] Zebrano {} plików", all.len()));
 
-                for (pattern_str, re) in &compiled_patterns {
-                    if let Some(m) = re.find(&file_name) { // dopasowanie w samej nazwie
-                        let mut family_key = if pattern_str == "^.*_\\d{2}\\." {
-                            let matched = &file_name[m.start()..m.end()];
-                            if matched.len() > 3 { matched[..matched.len()-3].to_string() } else { matched.to_string() }
-                        } else {
-                            // pełna nazwa pliku jako rodzina (odwzorowanie pierwotnej logiki C#)
-                            file_name.clone()
-                        };
-                        if family_key.is_empty() { family_key = file_name.clone(); }
-                        families.insert(family_key);
-                    }
+        // 2. Kompilacja regexów
+        let compiled: Vec<(String, Regex)> = regex_patterns.iter().filter_map(|p| {
+            match Regex::new(p) { Ok(r) => Some((p.clone(), r)), Err(e) => { logger::warning(format!("Błędny regex '{}': {}", p, e)); None } }
+        }).collect();
+        logger::process(format!("[CLEAN] Aktywnych regexów: {}", compiled.len()));
+
+        // 3. Dopasowania -> klucze
+        let mut keys: HashSet<String> = HashSet::new();
+        for (pat, re) in &compiled {
+            let mut matched_count = 0usize;
+            let mut new_keys = 0usize;
+            for f in &all {
+                if let Some(caps) = re.captures(&f.name) {
+                    matched_count += 1;
+                    let key = if caps.len() > 1 { caps.get(1).unwrap().as_str().to_string() } else {
+                        re.find(&f.name).map(|m| m.as_str().to_string()).unwrap_or_else(|| f.name.clone())
+                    };
+                    if key.len() >= 2 && keys.insert(key.clone()) { new_keys += 1; }
+                }
+            }
+            logger::process(format!("Regex '{}' dopasował {} plików (nowe klucze: {})", pat, matched_count, new_keys));
+        }
+        logger::process(format!("[CLEAN] Łącznie unikalnych kluczy: {}", keys.len()));
+
+        // 4. Dla każdego klucza policz pliki zawierające substring, usuń nadmiar
+        let mut total_deleted = 0usize;
+        for key in &keys {
+            let mut set: Vec<&FileInfo> = all.iter().filter(|f| f.name.contains(key)).collect();
+            if set.len() <= dup_to_leave as usize { continue; }
+            // sort descending (najnowsze na początku)
+            set.sort_by_key(|f| f.modified);
+            set.reverse();
+            let keep = dup_to_leave as usize;
+            let to_remove = &set[keep..];
+            logger::process(format!("Klucz '{}' -> plików={} zachowuję={} usuwam={}", key, set.len(), keep, to_remove.len()));
+            for fi in to_remove {
+                match fs::remove_file(&fi.path) {
+                    Ok(_) => { total_deleted += 1; logger::process(format!("[{}] Usunięto {}", key, fi.path)); },
+                    Err(e) => logger::warning(format!("[{}] Błąd usuwania {}: {}", key, fi.path, e)),
                 }
             }
         }
-
-        logger::process(format!("Zidentyfikowano {} rodzin plików", families.len()));
-
-        // 2. Dla każdej rodziny zbierz pasujące pliki (contains) i usuń starsze zostawiając dup_to_leave najnowszych.
-        for family in families.into_iter() {
-            // Zbierz pliki pasujące (contains)
-            let mut family_files: Vec<(String, SystemTime)> = entries_cache.iter()
-                .filter(|(name, _)| name.contains(&family))
-                .map(|(n, t)| (n.clone(), *t))
-                .collect();
-
-            if family_files.len() as u8 <= dup_to_leave { continue; }
-
-            // Sortuj od najnowszych do najstarszych (jak C# po reverse)
-            family_files.sort_by_key(|(_, t)| *t); // rosnąco (najstarsze pierwsze)
-            family_files.reverse(); // teraz najnowsze pierwsze
-
-            let to_delete = family_files.len().saturating_sub(dup_to_leave as usize);
-            if to_delete == 0 { continue; }
-            logger::process(format!("[{}] Plików: {}, do usunięcia: {}", family, family_files.len(), to_delete));
-
-            for (idx, _) in family_files.iter().enumerate() {
-                if idx >= to_delete { break; }
-            }
-            // Po odwróceniu najnowsze są na początku – chcemy zostawić dup_to_leave pierwszych, więc kasujemy od indeksu dup_to_leave wzwyż.
-            for (file_name, _) in family_files.iter().skip(dup_to_leave as usize) {
-                let full_path = base_path.join(file_name);
-                logger::process(format!("[{}] Usuwanie pliku {}", family, full_path.to_string_lossy()));
-                let _ = fs::remove_file(full_path);
-            }
-        }
-
+        logger::process(format!("[CLEAN] Podsumowanie: plików={} kluczy={} usunięto={} pozostawiono={}", all.len(), keys.len(), total_deleted, all.len().saturating_sub(total_deleted)));
         logger::process("Czyszczenie zakończone – oczekiwanie do następnego interwału.");
         sleep(sleep_duration).await;
     }
