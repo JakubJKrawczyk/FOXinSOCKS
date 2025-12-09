@@ -2,18 +2,18 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Default, Serialize, Deserialize, Clone)]
-pub enum TaskStatus{
-    #[serde(rename="sheduled")] // zachowanie dotychczasowego stringa (pisownia w danych)
+pub enum TaskStatus {
+    #[serde(rename = "sheduled")] // zachowanie dotychczasowego stringa (pisownia w danych)
     Sheduled,
-    #[serde(rename="in-progress")] // dostosowane do frontendu
+    #[serde(rename = "in-progress")] // dostosowane do frontendu
     InProgress,
     #[default]
-    #[serde(rename="idle")]
-    Idle
+    #[serde(rename = "idle")]
+    Idle,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct TaskModel{
+pub struct TaskModel {
     pub id: String,
     pub title: String,
     pub description: String,
@@ -26,7 +26,7 @@ pub struct TaskModel{
     pub number_of_dup_to_keep: u8,
 }
 
-impl TaskModel{
+impl TaskModel {
     /// Utwórz nowy TaskModel z domyślnymi wartościami i auto-generowanym ID.
     /// Domyślne wartości:
     ///  title: "New Task"
@@ -55,5 +55,7 @@ impl TaskModel{
 }
 
 impl Default for TaskModel {
-    fn default() -> Self { TaskModel::new_default() }
+    fn default() -> Self {
+        TaskModel::new_default()
+    }
 }

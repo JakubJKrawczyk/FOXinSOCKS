@@ -3,36 +3,50 @@
 //! (pojedynczą iterację) i weryfikuje czy liczba plików została zredukowana
 //! do oczekiwanej wartości (number_of_dup_to_keep) * liczba bazowych nazw.
 
+use foxinsocks_lib::models::task_model::TaskModel;
+use rand::{distributions::Alphanumeric, Rng};
 use std::fs::{self, File};
 use std::io::Write;
-use rand::{Rng, distributions::Alphanumeric};
-use foxinsocks_lib::models::task_model::TaskModel;
 
 // Pomocnicza funkcja: jedna iteracja czyszczenia – kopiujemy wewnętrzną logikę cleaning_command
-async fn single_clean_run(folder_path: &str, regex_patterns: &[String], dup_to_keep: u8){
+async fn single_clean_run(folder_path: &str, regex_patterns: &[String], dup_to_keep: u8) {
+    use regex::Regex;
+    use std::collections::HashMap;
     use std::path::Path;
     use walkdir::WalkDir;
-    use std::collections::HashMap;
-    use regex::Regex;
 
     let folder_path_path = Path::new(folder_path);
-    assert!(folder_path_path.exists() && folder_path_path.is_dir(), "Folder testowy nie istnieje");
+    assert!(
+        folder_path_path.exists() && folder_path_path.is_dir(),
+        "Folder testowy nie istnieje"
+    );
 
     let mut total_deleted = 0usize;
 
     for regex_str in regex_patterns {
         let re = Regex::new(regex_str).expect("Niepoprawny regex w teście");
         let mut file_groups: HashMap<String, Vec<(String, std::time::SystemTime)>> = HashMap::new();
-        for entry in WalkDir::new(folder_path_path).into_iter().filter_map(|e| e.ok()) {
-            if !entry.file_type().is_file(){ continue; }
+        for entry in WalkDir::new(folder_path_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
             let file_name = entry.file_name().to_string_lossy().to_string();
             if re.is_match(&file_name) {
-                if let Ok(metadata) = entry.metadata() { if let Ok(modified) = metadata.modified() {
-                    file_groups.entry(regex_str.clone()).or_default().push((entry.path().to_string_lossy().to_string(), modified));
-                }}
+                if let Ok(metadata) = entry.metadata() {
+                    if let Ok(modified) = metadata.modified() {
+                        file_groups
+                            .entry(regex_str.clone())
+                            .or_default()
+                            .push((entry.path().to_string_lossy().to_string(), modified));
+                    }
+                }
             }
         }
-        for (_name, mut files) in file_groups { // cleanup
+        for (_name, mut files) in file_groups {
+            // cleanup
             files.sort_by_key(|f| f.1);
             if files.len() > dup_to_keep as usize {
                 let to_delete = files.len() - dup_to_keep as usize;
@@ -43,11 +57,14 @@ async fn single_clean_run(folder_path: &str, regex_patterns: &[String], dup_to_k
             }
         }
     }
-    foxinsocks_lib::utills::logger::process(format!("[TEST] Usunięto {} plików w pojedynczym przebiegu", total_deleted));
+    foxinsocks_lib::utills::logger::process(format!(
+        "[TEST] Usunięto {} plików w pojedynczym przebiegu",
+        total_deleted
+    ));
 }
 
 #[tokio::test]
-async fn mass_cleanup_reduces_duplicates(){
+async fn mass_cleanup_reduces_duplicates() {
     // Parametry testu
     const BASE_FILES: usize = 100; // liczba bazowych nazw
     const DUPS_PER_BASE: usize = 100; // duplikatów tworzonych na bazę
@@ -55,7 +72,14 @@ async fn mass_cleanup_reduces_duplicates(){
 
     // Katalog testowy
     let mut dir = std::env::temp_dir();
-    dir.push(format!("foxinsocks_mass_test_{}", rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect::<String>()));
+    dir.push(format!(
+        "foxinsocks_mass_test_{}",
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect::<String>()
+    ));
     fs::create_dir_all(&dir).expect("Nie można utworzyć katalogu testowego");
 
     // Generacja plików oraz regexów
@@ -67,7 +91,16 @@ async fn mass_cleanup_reduces_duplicates(){
         let regex = format!("^{}.*\\.log$", regex::escape(&base));
         patterns.push(regex);
         for d in 0..DUPS_PER_BASE {
-            let file_name = format!("{}{}_{}.log", base, d, rand::thread_rng().sample_iter(&Alphanumeric).take(5).map(char::from).collect::<String>());
+            let file_name = format!(
+                "{}{}_{}.log",
+                base,
+                d,
+                rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(5)
+                    .map(char::from)
+                    .collect::<String>()
+            );
             let mut path = dir.clone();
             path.push(file_name);
             let mut f = File::create(&path).expect("create file");
@@ -78,7 +111,11 @@ async fn mass_cleanup_reduces_duplicates(){
 
     // Sanity check
     let initial_count = fs::read_dir(&dir).unwrap().count();
-    assert_eq!(initial_count, BASE_FILES * DUPS_PER_BASE, "Nie utworzono oczekiwanej liczby plików");
+    assert_eq!(
+        initial_count,
+        BASE_FILES * DUPS_PER_BASE,
+        "Nie utworzono oczekiwanej liczby plików"
+    );
 
     // Przygotowanie pseudo-taska (nie odpalamy create_process aby nie wchodzić w nieskończoną pętlę)
     let mut task = TaskModel::new_default();
@@ -87,18 +124,36 @@ async fn mass_cleanup_reduces_duplicates(){
     task.number_of_dup_to_keep = KEEP;
 
     // Jednorazowe odpalenie logiki czyszczącej (symulacja jednej iteracji)
-    single_clean_run(&task.folder_path, &task.regex_patterns, task.number_of_dup_to_keep).await;
+    single_clean_run(
+        &task.folder_path,
+        &task.regex_patterns,
+        task.number_of_dup_to_keep,
+    )
+    .await;
 
     // Weryfikacja: dla każdej grupy powinno zostać <= KEEP plików
     // Sprawdzamy przez iterację regexów
     for pattern in &patterns {
         let re = regex::Regex::new(pattern).unwrap();
         let mut matched = 0usize;
-        for entry in walkdir::WalkDir::new(&dir).into_iter().filter_map(|e| e.ok()) {
-            if !entry.file_type().is_file() { continue; }
+        for entry in walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
             let name = entry.file_name().to_string_lossy();
-            if re.is_match(&name) { matched += 1; }
+            if re.is_match(&name) {
+                matched += 1;
+            }
         }
-        assert!(matched as u8 <= KEEP, "Dla wzorca {} zostalo {} > {}", pattern, matched, KEEP);
+        assert!(
+            matched as u8 <= KEEP,
+            "Dla wzorca {} zostalo {} > {}",
+            pattern,
+            matched,
+            KEEP
+        );
     }
 }

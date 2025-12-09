@@ -1,9 +1,9 @@
+mod commands;
 pub mod controllers;
 mod data;
 pub mod models;
-mod commands;
 pub mod utills; // logger & inne utils
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+                // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 #[tauri::command]
 fn get_log_path() -> String {
@@ -26,12 +26,17 @@ fn get_all_logs() -> String {
 fn get_log_tail(lines: usize) -> String {
     use std::io::{Read, Seek, SeekFrom};
     let path = crate::utills::logger::current_log_file_path();
-    let file = match std::fs::File::open(&path) { Ok(f) => f, Err(_) => return String::new() };
+    let file = match std::fs::File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return String::new(),
+    };
     let size = file.metadata().map(|m| m.len()).unwrap_or(0);
     let window: u64 = 64 * 1024; // 64KB okno do odczytania z końca
     let start = if size > window { size - window } else { 0 };
     let mut f = file;
-    if start > 0 { let _ = f.seek(SeekFrom::Start(start)); }
+    if start > 0 {
+        let _ = f.seek(SeekFrom::Start(start));
+    }
     let mut buf = String::new();
     let _ = f.read_to_string(&mut buf);
     let lines_vec: Vec<&str> = buf.lines().collect();
@@ -42,10 +47,13 @@ fn get_log_tail(lines: usize) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use crate::commands::commands::{init, get_tasks, get_task, add_task, del_task, run_task, stop_task, update_task};
+    use crate::commands::commands::{
+        add_task, del_task, get_task, get_tasks, init, run_task, stop_task, update_task,
+    };
     // Wymuszenie wczesnej inicjalizacji loggera oraz wpis startowy
     crate::utills::logger::log("Aplikacja startuje - inicjalizacja loggera");
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         // Zapisz taski przy zamknięciu okna (kliknięcie X)
         .on_window_event(|_app_handle, event| {
@@ -54,19 +62,42 @@ pub fn run() {
                 if let Some(ctrl_mutex) = crate::commands::commands::CONTROLLER.get() {
                     match ctrl_mutex.lock() {
                         Ok(ctrl) => {
-                            match crate::controllers::file_system_controller::save_tasks(&ctrl.tasks) {
-                                Ok(_) => crate::utills::logger::log("Zapisano taski przed zamknięciem okna"),
-                                Err(e) => crate::utills::logger::error(format!("Błąd zapisu tasków przy zamykaniu: {}", e)),
+                            match crate::controllers::file_system_controller::save_tasks(
+                                &ctrl.tasks,
+                            ) {
+                                Ok(_) => crate::utills::logger::log(
+                                    "Zapisano taski przed zamknięciem okna",
+                                ),
+                                Err(e) => crate::utills::logger::error(format!(
+                                    "Błąd zapisu tasków przy zamykaniu: {}",
+                                    e
+                                )),
                             }
                         }
-                        Err(_) => crate::utills::logger::error("Nie udało się zablokować kontrolera przy zamykaniu okna"),
+                        Err(_) => crate::utills::logger::error(
+                            "Nie udało się zablokować kontrolera przy zamykaniu okna",
+                        ),
                     }
                 } else {
-                    crate::utills::logger::warning("Zamykanie okna - backend nie był zainicjalizowany, brak tasków do zapisu");
+                    crate::utills::logger::warning(
+                        "Zamykanie okna - backend nie był zainicjalizowany, brak tasków do zapisu",
+                    );
                 }
             }
         })
-    .invoke_handler(tauri::generate_handler![get_log_path, get_all_logs, get_log_tail, init, get_tasks, get_task, add_task, del_task, run_task, stop_task, update_task])
+        .invoke_handler(tauri::generate_handler![
+            get_log_path,
+            get_all_logs,
+            get_log_tail,
+            init,
+            get_tasks,
+            get_task,
+            add_task,
+            del_task,
+            run_task,
+            stop_task,
+            update_task
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

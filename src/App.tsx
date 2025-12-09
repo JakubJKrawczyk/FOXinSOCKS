@@ -4,11 +4,11 @@ import { useEffect, useState  } from "react";
 import TasksList from "./components/TasksList";
 import TasksController from "./backend/utilities/tasksController";
 import LogDrawer from "./components/LogDrawer";
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 
 function App() {
-
     const [refreshRunning, setrefreshRunning] = useState<boolean>(false);
-
+    
     if(!refreshRunning){
       runTaskWithInterval(refreshTasks, 5000);
       setrefreshRunning(true);
@@ -23,7 +23,26 @@ function App() {
   const [showLogDrawer, setShowLogDrawer] = useState<boolean>(false);
   const [logText, setLogText] = useState<string>("");
   const [logAutoScroll, setLogAutoScroll] = useState<boolean>(true);
+  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(false);
 
+  useEffect(() => {
+    isEnabled().then(setAutostartEnabled);
+  }, []);
+
+  const handleAutostartChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    try {
+      if (checked) {
+        await enable();
+      } else {
+        await disable();
+      }
+      setAutostartEnabled(checked);
+    } catch (error) {
+      showError(`Failed to update autostart: ${error}`);
+    }
+  };
+  
     const controller = new TasksController();
   // END OF VARIABLES
 
@@ -241,7 +260,7 @@ function App() {
   // Pobieranie logów (cała zawartość pliku) – wywoływane przy otwieraniu oraz w interwale.
   async function fetchLogs(){
     // pobieramy tylko ostatnie 400 linii dla oszczędności pamięci
-    const res = await controller.getLogTail(400);
+    const res = await controller.getLogTail(100);
     if(res.ok && 'data' in res){
       setLogText(res.data);
     }
@@ -273,12 +292,13 @@ function App() {
           <h1 className="title">Fox in Socks</h1>
           <p className="subtitle">A simple cleaner at your service</p>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button type="button" onClick={() => setShowLogDrawer(s => !s)}>
-              {showLogDrawer ? 'Ukryj logi' : 'Pokaż logi'}
+            <label>
+              <input type="checkbox" checked={autostartEnabled} onChange={handleAutostartChange}/>AutoStart
+            </label>
+
+            <button type="button" className=".button" onClick={() => setShowLogDrawer(s => !s)}>
+              {'Pokaż logi'}
             </button>
-            {showLogDrawer && (
-              <button type="button" onClick={() => fetchLogs()}>Odśwież logi</button>
-            )}
           </div>
         </div>
         {/* Bottom Container */}

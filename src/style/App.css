@@ -225,13 +225,13 @@ body {
     font-size:1.2rem;
   }
   
-  button{
+  .button{
       background-color: #242424 !important;
     border: 1px solid #444 !important;
     color:#bebebe !important;
   }
 
-  button:hover {
+  .button:hover {
     background-color: #a54403 !important;
     transition: 300ms !important;
     cursor: pointer !important;
@@ -239,7 +239,7 @@ body {
     color:#bebebe !important;
   }
 
-  button:active{
+  .button:active{
     background-color: #5e2601 !important;
     transition: 50ms !important;
     cursor: pointer !important;
@@ -346,7 +346,6 @@ body {
   font-size: 1.2rem;
   cursor: pointer !important;
 }
-.log-drawer-close:hover { color: #ffb4b4 !important; }
 .log-drawer-content {
   flex: 1;
   margin: 0;
